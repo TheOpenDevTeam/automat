@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+*.egg
+.venv/
+venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Project data
+settings.json
+tasks.json
+activity.db
+*.bak
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build
+*.exe
+*.spec

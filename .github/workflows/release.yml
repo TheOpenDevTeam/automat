@@ -1,0 +1,32 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11" 
+      - name: Install dependencies 
+        run: |
+          pip install -r automat/requirements.txt
+          pip install pyinstaller
+      - name: Build .exe
+        run: |
+          cd automat
+          pyinstaller --onedir --windowed --name "AUTOMAT" --add-data "ui;ui" --add-data "core;core" main.py
+      - name: Create ZIP
+        run: |
+          Compress-Archive -Path automat/dist/AUTOMAT/ -DestinationPath AUTOMAT-${{ github.ref_name }}.zip
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: AUTOMAT-${{ github.ref_name }}.zip
+          generate_release_notes: true
