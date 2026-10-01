@@ -4,14 +4,16 @@ using psutil and PyQtChart.
 """
 
 import datetime
+import os
+import platform
 
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 from PyQt5.QtChart import QChart, QChartView, QLineSeries, QValueAxis, QDateTimeAxis
 
-from config import ACCENT, ACCENT2, GREEN, YELLOW, RED
-from ui.page_base import PageWidget
+from automat.config import ACCENT, ACCENT2, GREEN
+from automat.ui.page_base import PageWidget
 
 try:
     import psutil
@@ -67,7 +69,6 @@ class SysMonitorPage(PageWidget):
 
         self.cpu_lbl = QLabel("0%")
         self.cpu_lbl.setObjectName("sysmon_big_value")
-        self.cpu_lbl.setProperty("accent_color", ACCENT)
         self.cpu_lbl.setAlignment(Qt.AlignCenter)
         cpu_layout.addWidget(self.cpu_lbl)
 
@@ -82,7 +83,6 @@ class SysMonitorPage(PageWidget):
 
         self.ram_lbl = QLabel("0%")
         self.ram_lbl.setObjectName("sysmon_big_value")
-        self.ram_lbl.setProperty("accent_color", ACCENT2)
         self.ram_lbl.setAlignment(Qt.AlignCenter)
         ram_layout.addWidget(self.ram_lbl)
 
@@ -97,7 +97,6 @@ class SysMonitorPage(PageWidget):
 
         self.disk_lbl = QLabel("0%")
         self.disk_lbl.setObjectName("sysmon_big_value")
-        self.disk_lbl.setProperty("accent_color", GREEN)
         self.disk_lbl.setAlignment(Qt.AlignCenter)
         disk_layout.addWidget(self.disk_lbl)
 
@@ -154,8 +153,9 @@ class SysMonitorPage(PageWidget):
         self.ram_series.attachAxis(self.axis_y)
 
         self.chart_view = QChartView(self.chart)
-        self.chart_view.setRenderHint(QPainter.Antialiasing)
+        self.chart_view.setRenderHint(QPainter.RenderHint.Antialiasing)
         chart_layout.addWidget(self.chart_view, 1)
+        self.refresh_theme()
 
         stats_grid.addWidget(chart_card, 1, 0, 1, 3)
 
@@ -166,6 +166,27 @@ class SysMonitorPage(PageWidget):
         stats_grid.setColumnStretch(1, 1)
         stats_grid.setColumnStretch(2, 1)
 
+    def _is_dark(self):
+        try:
+            return self.app.theme_mgr.is_dark
+        except Exception:
+            return True
+
+    def refresh_theme(self):
+        try:
+            dark = self._is_dark()
+            self.chart.setTheme(QChart.ChartThemeDark if dark else QChart.ChartThemeLight)
+            self.chart.setBackgroundBrush(QColor("#2c2f34" if dark else "#ffffff"))
+            lbl = QColor("#9aa0a8" if dark else "#5b6470")
+            grid = QColor("#3a3d43" if dark else "#e5e8ec")
+            for ax in (self.axis_x, self.axis_y):
+                ax.setLabelsColor(lbl)
+                ax.setTitleBrush(QBrush(lbl))
+                ax.setGridLineColor(grid)
+                ax.setLinePenColor(grid)
+        except Exception:
+            pass
+
     def _update(self):
         """Called every 2 seconds — refresh all gauges and chart data."""
         if not self._visible:
@@ -174,7 +195,8 @@ class SysMonitorPage(PageWidget):
             cpu = psutil.cpu_percent(interval=None)
             cpu_count = psutil.cpu_count()
             ram = psutil.virtual_memory()
-            disk = psutil.disk_usage("/")
+            disk = psutil.disk_usage(os.environ.get("SystemDrive", "C:") + "\\"
+                                      if platform.system() == "Windows" else "/")
         except Exception:
             return
 

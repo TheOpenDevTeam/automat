@@ -1,7 +1,7 @@
 import logging
 import sys
 from pathlib import Path
-from config import DATA_DIR
+from automat.config import DATA_DIR
 
 _LOG_FILE = DATA_DIR / "app.log"
 

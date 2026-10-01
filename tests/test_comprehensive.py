@@ -12,9 +12,6 @@ import os
 import sys
 from pathlib import Path
 
-# Ensure automat/ is on sys.path
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "automat"))
-
 
 # ======================================================================
 # CalcManager tests
@@ -25,7 +22,7 @@ class TestCalcManager:
 
     @pytest.fixture
     def calc(self):
-        from core.calc_manager import CalcManager
+        from automat.core.calc_manager import CalcManager
         return CalcManager
 
     def test_addition(self, calc):
@@ -88,22 +85,22 @@ class TestActivityLog:
 
     def test_log_with_db_failure(self, monkeypatch):
         """Log should not raise even if DB fails."""
-        from core.activity_log import log, EVENT_CONVERT, STATUS_OK
+        from automat.core.activity_log import log, EVENT_CONVERT, STATUS_OK
         monkeypatch.setattr(
-            "core.activity_log._conn",
+            "automat.core.activity_log._conn",
             lambda: (_ for _ in ()).throw(Exception("DB fail"))
         )
         log(EVENT_CONVERT, STATUS_OK, "test")  # should not raise
 
     def test_get_success_rate_empty(self):
         """Success rate on empty DB should be 1.0."""
-        from core.activity_log import get_success_rate
+        from automat.core.activity_log import get_success_rate
         rate = get_success_rate()
         assert rate == 1.0
 
     def test_event_constants(self):
         """Verify event type constants are defined."""
-        from core import activity_log
+        from automat.core import activity_log
         assert activity_log.EVENT_CONVERT == "convert"
         assert activity_log.EVENT_SEND == "send"
         assert activity_log.EVENT_HASH == "hash"
@@ -115,7 +112,7 @@ class TestActivityLog:
 
     def test_status_constants(self):
         """Verify status constants are defined."""
-        from core import activity_log
+        from automat.core import activity_log
         assert activity_log.STATUS_OK == "ok"
         assert activity_log.STATUS_ERROR == "error"
         assert activity_log.STATUS_SKIP == "skip"
@@ -129,7 +126,7 @@ class TestI18n:
     """Test the internationalization system."""
 
     def test_all_keys_in_both_langs(self):
-        from i18n import TRANSLATIONS
+        from automat.i18n import TRANSLATIONS
         ru_keys = set(TRANSLATIONS["ru"].keys())
         en_keys = set(TRANSLATIONS["en"].keys())
         missing_in_en = ru_keys - en_keys
@@ -138,46 +135,46 @@ class TestI18n:
         assert not missing_in_ru, f"Keys missing in RU: {missing_in_ru}"
 
     def test_basic_translation(self):
-        from i18n import I18n
+        from automat.i18n import I18n
         i18n = I18n("ru")
         assert i18n.tr("app_title") == "AUTOMAT — Менеджер автоматизации задач"
 
     def test_english_translation(self):
-        from i18n import I18n
+        from automat.i18n import I18n
         i18n = I18n("en")
         assert i18n.tr("app_title") == "AUTOMAT — Task Automation Manager"
 
     def test_format_string(self):
-        from i18n import I18n
+        from automat.i18n import I18n
         i18n = I18n("ru")
         result = i18n.tr("app_subtitle", version="2.0")
         assert result == "v2.0"
 
     def test_fallback_to_ru(self):
-        from i18n import I18n
+        from automat.i18n import I18n
         i18n = I18n("de")  # unsupported language
         assert i18n.lang == "ru"
 
     def test_missing_key_returns_key(self):
-        from i18n import I18n
+        from automat.i18n import I18n
         i18n = I18n("ru")
         assert i18n.tr("nonexistent_key") == "nonexistent_key"
 
     def test_language_switch(self):
-        from i18n import I18n
+        from automat.i18n import I18n
         i18n = I18n("ru")
         assert i18n.tr("status_ready") == "Готов к работе"
         i18n.lang = "en"
         assert i18n.tr("status_ready") == "Ready"
 
     def test_invalid_language_set(self):
-        from i18n import I18n
+        from automat.i18n import I18n
         i18n = I18n("ru")
         i18n.lang = "xyz"
         assert i18n.lang == "ru"  # unchanged
 
     def test_sidebar_keys_exist(self):
-        from i18n import TRANSLATIONS
+        from automat.i18n import TRANSLATIONS
         for lang in ["ru", "en"]:
             assert "sidebar_tools" in TRANSLATIONS[lang]
             assert "sidebar_new" in TRANSLATIONS[lang]
@@ -185,7 +182,7 @@ class TestI18n:
 
     def test_page_keys_count(self):
         """Verify all 16 page keys exist in translations."""
-        from i18n import TRANSLATIONS
+        from automat.i18n import TRANSLATIONS
         page_keys = [
             "page_dash", "page_convert", "page_bulk", "page_telegram",
             "page_hash", "page_datagen", "page_cleandata", "page_fileops",
@@ -211,7 +208,7 @@ class TestThemeManager:
     def test_default_theme(self, tmp_path):
         settings_file = str(tmp_path / "settings.json")
         settings = {"theme": "dark"}
-        from core.theme_manager import ThemeManager
+        from automat.core.theme_manager import ThemeManager
         mgr = ThemeManager(settings, settings_file)
         assert mgr.current == "dark"
         assert mgr.is_dark is True
@@ -219,7 +216,7 @@ class TestThemeManager:
     def test_toggle(self, tmp_path):
         settings_file = str(tmp_path / "settings.json")
         settings = {"theme": "dark"}
-        from core.theme_manager import ThemeManager
+        from automat.core.theme_manager import ThemeManager
         mgr = ThemeManager(settings, settings_file)
         new = mgr.toggle()
         assert new == "light"
@@ -229,7 +226,7 @@ class TestThemeManager:
     def test_qss_loaded(self, tmp_path):
         settings_file = str(tmp_path / "settings.json")
         settings = {"theme": "dark"}
-        from core.theme_manager import ThemeManager
+        from automat.core.theme_manager import ThemeManager
         mgr = ThemeManager(settings, settings_file)
         assert "dark" in mgr._qss_cache
         assert "light" in mgr._qss_cache

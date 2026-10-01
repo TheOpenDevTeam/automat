@@ -7,12 +7,12 @@ from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 import csv, json, re
-from config import ACCENT, GREEN, RED
-from ui.page_base import PageWidget
-from ui.widgets import LogPanel, ProgressBar
-from core.activity_log import log, EVENT_CLEAN, STATUS_OK
-from core.worker import run_in_background
-from util import safe
+from automat.config import ACCENT, GREEN, RED
+from automat.ui.page_base import PageWidget
+from automat.ui.widgets import LogPanel, ProgressBar
+from automat.core.activity_log import log, EVENT_CLEAN, STATUS_OK
+from automat.core.worker import run_in_background
+from automat.util import safe
 
 
 class CleanDataPage(PageWidget):
@@ -169,7 +169,9 @@ class CleanDataPage(PageWidget):
                 data = new
                 safe(self.log_panel.write, f"OK Duplicates removed: {before - len(data)}", "ok")
             elif key == "cleandata_rm_empty":
-                data = [r for r in data if any(v.strip() for v in r.values() if isinstance(v, str))]
+                data = [r for r in data if any(
+                    str(v).strip() for v in r.values()
+                )]
                 safe(self.log_panel.write, f"OK Empty rows removed: -{before - len(data)}", "ok")
             elif key == "cleandata_trim":
                 for r in data:
@@ -192,7 +194,7 @@ class CleanDataPage(PageWidget):
                                 r[k] = f"+7{num[1:]}"
                             elif len(num) == 7:
                                 r[k] = f"+7495{num}"
-            safe(self.progress.setValue, int((idx + 1) / total_steps * 100))
+            safe(self.progress.setValue, int((idx + 1) / total_steps * 100) if total_steps > 0 else 0)
 
         self.data = data
         log(EVENT_CLEAN, STATUS_OK, f"{len(data)} rows", len(data))

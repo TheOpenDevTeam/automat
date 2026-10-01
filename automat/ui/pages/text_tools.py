@@ -11,9 +11,8 @@ from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 
-from config import ACCENT, ACCENT2, GREEN, YELLOW, RED
-from ui.page_base import PageWidget
-from core.activity_log import log, EVENT_TEXT, STATUS_OK
+from automat.ui.page_base import PageWidget
+from automat.core.activity_log import log, EVENT_TEXT, STATUS_OK
 
 
 class TextToolsPage(PageWidget):
@@ -199,7 +198,7 @@ class TextToolsPage(PageWidget):
             sel.cursor = self.editor.textCursor()
             sel.cursor.setPosition(m.start())
             sel.cursor.setPosition(m.end(), QTextCursor.KeepAnchor)
-            sel.format.setBackground(QColor(ACCENT + "55"))
+            sel.format.setBackground(QColor(80, 130, 220, 60))
             selections.append(sel)
         self.editor.setExtraSelections(selections)
 
@@ -238,14 +237,20 @@ class TextToolsPage(PageWidget):
     def _load_file(self):
         fp, _ = QFileDialog.getOpenFileName(self, self.app.i18n.tr("text_load"), "", "Text (*.txt);;All files (*.*)")
         if fp:
-            with open(fp, encoding="utf-8", errors="ignore") as f:
-                self.editor.setPlainText(f.read())
+            try:
+                with open(fp, encoding="utf-8", errors="ignore") as f:
+                    self.editor.setPlainText(f.read())
+            except Exception as e:
+                QMessageBox.warning(self, "Error", str(e))
 
     def _save_file(self):
         fp, _ = QFileDialog.getSaveFileName(self, self.app.i18n.tr("text_save"), "", "Text (*.txt);;All files (*.*)")
         if fp:
-            with open(fp, "w", encoding="utf-8") as f:
-                f.write(self.editor.toPlainText())
+            try:
+                with open(fp, "w", encoding="utf-8") as f:
+                    f.write(self.editor.toPlainText())
+            except Exception as e:
+                QMessageBox.warning(self, "Error", str(e))
 
     # ------------------------------------------------------------------
     # Regex Tester tab
@@ -352,9 +357,11 @@ class TextToolsPage(PageWidget):
                         if val is not None:
                             lines.append(f"  [{name}] = {val!r}")
                 for g in range(1, m.lastindex + 1):
-                    gname = compiled.groupindex.get(g, f"group {g}")
-                    if isinstance(gname, int):
-                        lines.append(f"  group {gname}: {m.group(g)!r}")
+                    gname = compiled.groupindex.get(g, None)
+                    if gname:
+                        lines.append(f"  [{gname}] = {m.group(g)!r}")
+                    else:
+                        lines.append(f"  group {g}: {m.group(g)!r}")
             lines.append("")
 
         self.regex_output.setPlainText("\n".join(lines))
@@ -365,7 +372,6 @@ class TextToolsPage(PageWidget):
             sel.cursor = self.regex_input.textCursor()
             sel.cursor.setPosition(m.start())
             sel.cursor.setPosition(m.end(), QTextCursor.KeepAnchor)
-            sel.format.setBackground(QColor(ACCENT + "55"))
-            sel.format.setForeground(QColor("#ffffff"))
+            sel.format.setBackground(QColor(80, 130, 220, 60))
             extra_selections.append(sel)
         self.regex_input.setExtraSelections(extra_selections)

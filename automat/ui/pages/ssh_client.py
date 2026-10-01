@@ -6,11 +6,11 @@ Fixed: thread-safety for QMessageBox, uses Worker pattern.
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
-from config import ACCENT, GREEN, RED
-from ui.page_base import PageWidget
-from ui.widgets import LogPanel
-from core.worker import run_in_background
-from util import safe
+from automat.config import GREEN
+from automat.ui.page_base import PageWidget
+from automat.ui.widgets import LogPanel
+from automat.core.worker import run_in_background
+from automat.util import safe
 
 try:
     import paramiko
@@ -23,6 +23,7 @@ class SSHClientPage(PageWidget):
     def __init__(self, app):
         super().__init__(app)
         self.connected = False
+        self._connecting = False
         self.client = None
         self.build()
 
@@ -105,70 +106,100 @@ class SSHClientPage(PageWidget):
     def _toggle_connect(self):
         if self.connected:
             self._disconnect()
-        else:
-            # Run connection in background thread
-            run_in_background(
-                self._connect_task,
-                on_result=self._on_connect_result,
-                on_error=self._on_connect_error,
-            )
+            return
+        if self._connecting:
+            return
 
-    def _connect_task(self):
-        """Background task — may show QMessageBox via safe()."""
         tr = self.app.i18n.tr
         if not HAS_PARAMIKO:
-            raise RuntimeError(tr("ssh_no_paramiko"))
+            self.log_panel.write(tr("ssh_no_paramiko"), "err")
+            return
 
-        # Show confirmation dialog on the main thread and wait for result
-        result = [None]
-        event = QEventLoop()
+        # Read the widgets here, on the GUI thread: Qt widgets must never be
+        # touched from a worker thread. The worker gets a plain snapshot.
+        host = self.host.text().strip()
+        if not host:
+            self.log_panel.write(tr("ssh_no_host"), "err")
+            return
 
-        def ask_user():
-            reply = QMessageBox.question(
-                self, tr("ssh_confirm_title"), tr("ssh_confirm_msg"),
-                QMessageBox.Yes | QMessageBox.No
-            )
-            result[0] = reply
-            event.quit()
+        reply = QMessageBox.question(
+            self, tr("ssh_confirm_title"), tr("ssh_confirm_msg"),
+            QMessageBox.Yes | QMessageBox.No
+        )
+        if reply != QMessageBox.Yes:
+            return
 
-        QTimer.singleShot(0, ask_user)
-        event.exec_()
-
-        if result[0] != QMessageBox.Yes:
-            return None
-
-        self.client = paramiko.SSHClient()
-        self.client.set_missing_host_key_policy(paramiko.WarningPolicy())
-        kwargs = {
-            "hostname": self.host.text(),
+        params = {
+            "hostname": host,
             "port": self.port.value(),
-            "username": self.user.text(),
+            "username": self.user.text().strip(),
+            "password": self.password.text(),
+            "key_filename": self.key_file.text().strip(),
+        }
+
+        self._connecting = True
+        self.connect_btn.setEnabled(False)
+        self.conn_status.setText(tr("ssh_connecting"))
+
+        run_in_background(
+            self._connect_task,
+            params,
+            on_result=self._on_connect_result,
+            on_error=self._on_connect_error,
+        )
+
+    def _connect_task(self, params):
+        """Background thread — uses only the snapshot, never Qt widgets."""
+        if not HAS_PARAMIKO:
+            raise RuntimeError("paramiko is not installed")
+
+        client = paramiko.SSHClient()
+        client.set_missing_host_key_policy(paramiko.WarningPolicy())
+        kwargs = {
+            "hostname": params["hostname"],
+            "port": params["port"],
+            "username": params["username"],
             "timeout": 10,
         }
-        if self.password.text():
-            kwargs["password"] = self.password.text()
-        if self.key_file.text():
-            kwargs["key_filename"] = self.key_file.text()
-        self.client.connect(**kwargs)
-        self.connected = True
-        return self.host.text()
+        if params["password"]:
+            kwargs["password"] = params["password"]
+        if params["key_filename"]:
+            kwargs["key_filename"] = params["key_filename"]
+        client.connect(**kwargs)
+
+        self.client = client
+        return params["hostname"]
 
     def _on_connect_result(self, host):
         tr = self.app.i18n.tr
+        self.connected = True
+        self._connecting = False
         self.conn_status.setText(tr("ssh_connected"))
         self.conn_status.setProperty("conn_state", "connected")
         self.conn_status.style().unpolish(self.conn_status)
         self.conn_status.style().polish(self.conn_status)
         self.connect_btn.setText(tr("ssh_disconnect"))
+        self.connect_btn.setEnabled(True)
         self.log_panel.write(tr("ssh_connected_to", host=host), "ok")
+        # The secret has been handed to paramiko; do not keep it in the UI.
+        self.password.clear()
 
     def _on_connect_error(self, error):
+        tr = self.app.i18n.tr
+        self.connected = False
+        self._connecting = False
+        self.conn_status.setText(tr("ssh_not_connected"))
+        self.connect_btn.setEnabled(True)
         self.log_panel.write(f"\u2717 {error}", "err")
 
     def _disconnect(self):
         tr = self.app.i18n.tr
-        if self.client:
-            self.client.close()
+        client, self.client = self.client, None
+        if client:
+            try:
+                client.close()
+            except Exception:
+                pass
         self.connected = False
         self.conn_status.setText(tr("ssh_not_connected"))
         self.conn_status.setProperty("conn_state", "disconnected")
@@ -181,9 +212,16 @@ class SSHClientPage(PageWidget):
         if not self.connected or not self.client:
             self.log_panel.write(self.app.i18n.tr("ssh_no_connection"), "err")
             return
+        # Snapshot both in the GUI thread: the client may be closed by
+        # _disconnect() while the worker is still running.
+        client = self.client
         cmd = self.cmd_input.text()
+        if not cmd:
+            return
+        self.output.appendPlainText(f"$ {cmd}")
         run_in_background(
             self._run_cmd,
+            client,
             cmd,
             on_result=lambda _: None,
             on_error=lambda e: self.log_panel.write(f"\u2717 {e}", "err"),
@@ -193,11 +231,10 @@ class SSHClientPage(PageWidget):
         self.cmd_input.setText(cmd)
         self._exec_cmd()
 
-    def _run_cmd(self, cmd):
-        stdin, stdout, stderr = self.client.exec_command(cmd, timeout=10)
+    def _run_cmd(self, client, cmd):
+        stdin, stdout, stderr = client.exec_command(cmd, timeout=10)
         out = stdout.read().decode("utf-8", errors="ignore")
         err = stderr.read().decode("utf-8", errors="ignore")
         result = out + err
-        safe(self.output.appendPlainText, f"$ {cmd}")
         safe(self.output.appendPlainText, result)
         safe(self.log_panel.write, f"\u2713 {cmd}", "ok")

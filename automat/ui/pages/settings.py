@@ -2,10 +2,10 @@ from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 import json
-from config import ACCENT, ACCENT2, GREEN, YELLOW, RED, SETTINGS_FILE
-from i18n import LANGUAGES
-from ui.page_base import PageWidget
-from ui.widgets import Toast, ValidatedLineEdit
+from automat.config import GREEN, SETTINGS_FILE
+from automat.i18n import LANGUAGES
+from automat.ui.page_base import PageWidget
+from automat.ui.widgets import Toast, ValidatedLineEdit
 
 
 class SettingsPage(PageWidget):
@@ -71,6 +71,18 @@ class SettingsPage(PageWidget):
         clear_btn.clicked.connect(self._clear_log)
         l3.addWidget(clear_btn)
 
+        c4, i4, l4 = self.card(tr("auto_update_title"))
+        self.content_layout.addWidget(c4)
+        export_btn = QPushButton(f"  {tr('settings_export_btn')}")
+        export_btn.clicked.connect(self.app._export_settings)
+        l4.addWidget(export_btn)
+        import_btn = QPushButton(f"  {tr('settings_import_btn')}")
+        import_btn.clicked.connect(self.app._import_settings)
+        l4.addWidget(import_btn)
+        update_btn = QPushButton(f"  {tr('auto_update_check')}")
+        update_btn.clicked.connect(self.app._check_updates)
+        l4.addWidget(update_btn)
+
         save_btn = QPushButton(f"  {tr('settings_save')}")
         save_btn.setObjectName("success")
         save_btn.clicked.connect(self._save)
@@ -97,7 +109,7 @@ class SettingsPage(PageWidget):
     def _on_theme_change(self, idx):
         theme = self.theme_combo.currentData()
         self.app.settings_data["theme"] = theme
-        self.app._apply_theme()
+        self.app.apply_theme()
         self.app.theme_btn.setText("\U0001f319" if theme == "dark" else "\u2600\ufe0f")
         self.app._refresh_icons()
 
@@ -118,7 +130,7 @@ class SettingsPage(PageWidget):
                        "user": self.proxy_user.text(), "pass": self.proxy_pass.text()}
         try:
             with open(SETTINGS_FILE, "w") as f:
-                json.dump(s, f, indent=2)
+                json.dump(s, f, indent=2, ensure_ascii=False)
             Toast(self.app, f"  {self.app.i18n.tr('settings_saved')}", GREEN)
         except Exception as e:
             QMessageBox.critical(self, self.app.i18n.tr("settings_error"), str(e))
@@ -142,9 +154,9 @@ class SettingsPage(PageWidget):
 
     def _clear_log(self):
         try:
-            from core.activity_log import _DB_FILE, _init
-            import os
-            os.remove(_DB_FILE)
+            from automat.core.activity_log import _DB_FILE, _init
+            from automat.core import db
+            db.delete_database(_DB_FILE)
             _init()
             Toast(self.app, f"  {self.app.i18n.tr('settings_cleared')}", GREEN)
         except Exception as e:

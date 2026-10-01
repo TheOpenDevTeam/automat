@@ -4,6 +4,7 @@ recent events feed, 7-day chart, and real-time system info.
 """
 
 import sys
+import os
 import time
 import platform
 
@@ -12,10 +13,10 @@ from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 from PyQt5.QtChart import QChart, QChartView, QBarSeries, QBarSet, QBarCategoryAxis, QValueAxis
 
-from config import ACCENT, ACCENT2, GREEN, YELLOW, RED
-from ui.page_base import PageWidget
-from ui.widgets import SkeletonBlock
-from core.activity_log import (
+from automat.config import ACCENT, ACCENT2, GREEN, YELLOW, RED
+from automat.ui.page_base import PageWidget
+from automat.ui.widgets import SkeletonBlock
+from automat.core.activity_log import (
     get_totals,
     get_today_totals,
     get_recent_events,
@@ -23,7 +24,7 @@ from core.activity_log import (
     get_error_count,
     get_success_rate,
 )
-from core.worker import run_in_background
+from automat.core.worker import run_in_background
 
 try:
     import psutil as _psutil
@@ -75,7 +76,6 @@ class DashPage(PageWidget):
 
             icon_lbl = QLabel(ico)
             icon_lbl.setObjectName("stat_icon")
-            icon_lbl.setProperty("icon_color", clr)
             icon_lbl.setAlignment(Qt.AlignCenter)
             inner_layout.addWidget(icon_lbl)
 
@@ -110,13 +110,11 @@ class DashPage(PageWidget):
         actions = QGridLayout()
         actions.setSpacing(8)
         layout2.addLayout(actions)
-        colors = [ACCENT, ACCENT2, GREEN, YELLOW]
         pages = ["convert", "bulk", "telegram", "cron"]
         for i, txt in enumerate([tr('dash_convert'), tr('dash_bulk'),
                                   tr('dash_telegram'), tr('dash_cron')]):
             btn = QPushButton(txt)
             btn.setObjectName("dash_action_btn")
-            btn.setProperty("action_color", colors[i])
             btn.setCursor(Qt.PointingHandCursor)
             btn.clicked.connect(lambda checked, p=pages[i]: self.app.show_page(p))
             actions.addWidget(btn, i // 2, i % 2)
@@ -131,11 +129,13 @@ class DashPage(PageWidget):
         card4, _inner4, layout4 = self.card(f"  {tr('dash_chart')}")
         grid.addWidget(card4, 2, 0, 1, 2)
         self.chart_view = QChartView()
-        self.chart_view.setRenderHint(QPainter.Antialiasing)
+        self.chart_view.setRenderHint(QPainter.RenderHint.Antialiasing)
         self.chart = QChart()
         self.chart.setObjectName("dash_chart")
         self.chart_view.setChart(self.chart)
+        self.chart.setBackgroundRoundness(6)
         layout4.addWidget(self.chart_view)
+        self.refresh_theme()
 
         # Row 2, col 2-3: system info
         card5, _inner5, layout5 = self.card(f"  {tr('dash_system')}")
@@ -168,7 +168,7 @@ class DashPage(PageWidget):
         run_in_background(
             self._load_data,
             on_result=self._apply,
-            on_error=lambda e: print(f"Dashboard load error: {e}"),
+            on_error=lambda e: self.feed.addItem(f"Error: {e}") if hasattr(self, "feed") else None,
         )
 
     def _load_data(self):
@@ -228,6 +228,7 @@ class DashPage(PageWidget):
             axis_y = QValueAxis()
             self.chart.addAxis(axis_y, Qt.AlignLeft)
             series.attachAxis(axis_y)
+            self._style_axes(axis_x, axis_y)
 
         self._clear_grid(self.sys_grid)
 
@@ -235,7 +236,8 @@ class DashPage(PageWidget):
             cpu = f"{_psutil.cpu_percent(interval=None):.0f}%"
             ram = _psutil.virtual_memory()
             ram_pct = f"{ram.percent:.0f}%  ({ram.used // (1024**2)} / {ram.total // (1024**2)} MB)"
-            disk = _psutil.disk_usage("/")
+            disk = _psutil.disk_usage(os.environ.get("SystemDrive", "C:") + "\\"
+                                       if platform.system() == "Windows" else "/")
             disk_pct = f"{disk.percent:.0f}%  ({disk.used // (1024**3):.1f} / {disk.total // (1024**3):.1f} GB)"
             net = _psutil.net_io_counters()
             net_str = f"\u2b07 {net.bytes_recv // (1024**2)} MB  \u2b06 {net.bytes_sent // (1024**2)} MB"
@@ -274,9 +276,44 @@ class DashPage(PageWidget):
             self.sys_grid.addWidget(kl, i, 0)
             vl = QLabel(value)
             vl.setObjectName("sys_value")
-            if color:
-                vl.setProperty("val_color", color)
             self.sys_grid.addWidget(vl, i, 1)
+
+    def _is_dark(self):
+        try:
+            return self.app.theme_mgr.is_dark
+        except Exception:
+            return True
+
+    def refresh_theme(self):
+        try:
+            dark = self._is_dark()
+            self.chart.setTheme(QChart.ChartThemeDark if dark else QChart.ChartThemeLight)
+            self.chart.setBackgroundBrush(QColor("#2c2f34" if dark else "#ffffff"))
+            lbl = QColor("#9aa0a8" if dark else "#5b6470")
+            grid = QColor("#3a3d43" if dark else "#e5e8ec")
+            for ax in self.chart.axes():
+                try:
+                    ax.setLabelsColor(lbl)
+                    ax.setTitleBrush(QBrush(lbl))
+                    ax.setGridLineColor(grid)
+                    ax.setLinePenColor(grid)
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+    def _style_axes(self, axis_x, axis_y):
+        try:
+            dark = self._is_dark()
+            lbl = QColor("#9aa0a8" if dark else "#5b6470")
+            grid = QColor("#3a3d43" if dark else "#e5e8ec")
+            for ax in (axis_x, axis_y):
+                ax.setLabelsColor(lbl)
+                ax.setTitleBrush(QBrush(lbl))
+                ax.setGridLineColor(grid)
+                ax.setLinePenColor(grid)
+        except Exception:
+            pass
 
     def _clear_grid(self, grid: QGridLayout):
         while grid.count():

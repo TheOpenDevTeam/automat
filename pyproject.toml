@@ -4,8 +4,8 @@ build-backend = "setuptools.backends._legacy:_Backend"
 
 [project]
 name = "automat"
-version = "1.0"
-description = "Task Automation Manager — open-source инструмент для автоматизации"
+version = "2.0b1"
+description = "Task Automation Manager — open-source инструмент для автоматизации с расширенным функционалом"
 readme = "README.md"
 license = {text = "GPL-3.0-only"}
 requires-python = ">=3.9"
@@ -22,12 +22,17 @@ dependencies = [
     "pdfplumber>=0.11.0",
     "Pillow>=10.2.0",
     "paramiko>=3.4.0",
+    "qrcode>=7.4.2",
+    "PyYAML>=6.0",
+    # Windows-only: DOCX -> PDF via Word COM. convert_pro degrades
+    # gracefully when it is missing (shows an install hint instead).
+    "docx2pdf>=0.1.1; sys_platform == 'win32'",
 ]
 
 [project.urls]
-Source = "https://github.com/OpenDev/automat"
-Documentation = "https://github.com/OpenDev/automat#readme"
-Tracker = "https://github.com/OpenDev/automat/issues"
+Source = "https://github.com/TheOpenDevTeam/automat"
+Documentation = "https://github.com/TheOpenDevTeam/automat#readme"
+Tracker = "https://github.com/TheOpenDevTeam/automat/issues"
 
 [project.scripts]
 automat = "automat.main:main"

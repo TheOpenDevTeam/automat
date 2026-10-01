@@ -6,13 +6,18 @@ Fixed: undo support for rename and organize operations.
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
-import os, shutil, fnmatch
-from config import ACCENT, GREEN, RED
-from ui.page_base import PageWidget
-from ui.widgets import LogPanel
-from core.activity_log import log, EVENT_FILEOP, STATUS_OK, STATUS_ERROR
-from core.worker import run_in_background
-from util import safe
+import os, shutil, fnmatch, threading
+from automat.config import ACCENT, GREEN, RED
+from automat.ui.page_base import PageWidget
+from automat.ui.widgets import LogPanel
+from automat.core.activity_log import log, EVENT_FILEOP, STATUS_OK, STATUS_ERROR
+from automat.core.worker import run_in_background
+from automat.util import safe
+
+# Search runs off the GUI thread; results stream in batches so a huge tree
+# never freezes the list widget, and we stop growing it at the cap.
+SEARCH_BATCH = 200
+SEARCH_LIMIT = 5000
 
 
 class FileOpsPage(PageWidget):
@@ -21,6 +26,8 @@ class FileOpsPage(PageWidget):
         self.tr = self.app.i18n.tr
         self._rename_history = []  # [(old_path, new_path), ...]
         self._organize_history = []  # [(src, dst), ...]
+        self._search_running = False
+        self._search_stop = threading.Event()
         self.build()
 
     def build(self):
@@ -104,7 +111,8 @@ class FileOpsPage(PageWidget):
                     os.rename(src, dst)
                     self._rename_history.append((dst, src))
                     self.ren_log.append(f"OK {f} -> {nname}")
-        log(EVENT_FILEOP, STATUS_OK, "rename", 1)
+        if not preview:
+            log(EVENT_FILEOP, STATUS_OK, "rename", 1)
 
     def _undo_rename(self):
         if not self._rename_history:
@@ -216,37 +224,115 @@ class FileOpsPage(PageWidget):
         srch_btn.setObjectName("accent")
         srch_btn.setToolTip("Search files")
         srch_btn.clicked.connect(self._do_search)
+        self.srch_btn = srch_btn
         l.addWidget(srch_btn)
         self.srch_results = QListWidget()
         l.addWidget(self.srch_results)
         tabs.addTab(w, tr("fileops_search"))
 
+    # ------------------------------------------------------------------
+    # Search (background: os.walk + content reads never block the GUI)
+    # ------------------------------------------------------------------
     def _do_search(self):
+        if self._search_running:
+            # Second click cancels the running scan.
+            self._search_stop.set()
+            return
+
         tr = self.tr
+        path = self.srch_path.text().strip()
+        if not path or not os.path.isdir(path):
+            self.srch_results.clear()
+            self.srch_results.addItem(tr("fileops_search_bad_path"))
+            return
+
+        # Snapshot every widget read here, on the GUI thread.
+        snapshot = {
+            "path": path,
+            "mask": self.srch_mask.text().strip() or "*.*",
+            "text": self.srch_text.text().strip(),
+            "recursive": self.srch_recursive.isChecked(),
+        }
+
         self.srch_results.clear()
-        path = self.srch_path.text()
-        mask = self.srch_mask.text()
-        text = self.srch_text.text()
-        recursive = self.srch_recursive.isChecked()
-        count = 0
+        self._search_stop = threading.Event()
+        self._search_running = True
+        self.srch_btn.setText(tr("fileops_searching"))
+
+        run_in_background(
+            self._search_task,
+            snapshot,
+            self._search_stop,
+            on_result=self._search_finished,
+            on_error=self._search_failed,
+        )
+
+    def _search_task(self, snapshot, stop):
+        """Worker: walks the tree and reads matching files. No widget access."""
+        path = snapshot["path"]
+        mask = snapshot["mask"]
+        text = snapshot["text"]
+        recursive = snapshot["recursive"]
+
+        found = 0
+        batch = []
+        hit_limit = False
+
         for root, dirs, files in os.walk(path):
-            if not recursive and root != path:
-                continue
-            for f in files:
-                if fnmatch.fnmatch(f, mask):
-                    fp = os.path.join(root, f)
-                    if text:
-                        try:
-                            with open(fp, "r", encoding="utf-8", errors="ignore") as fh:
-                                if text in fh.read():
-                                    self.srch_results.addItem(fp)
-                                    count += 1
-                        except Exception:
-                            pass
-                    else:
-                        self.srch_results.addItem(fp)
-                        count += 1
-        self.srch_results.addItem(tr("fileops_found").format(n=count))
+            if stop.is_set():
+                break
+            if not recursive:
+                if root != path:
+                    dirs[:] = []
+                    break
+            for fname in files:
+                if stop.is_set():
+                    break
+                if not fnmatch.fnmatch(fname, mask):
+                    continue
+                fp = os.path.join(root, fname)
+                if text:
+                    try:
+                        with open(fp, "r", encoding="utf-8", errors="ignore") as fh:
+                            if text not in fh.read():
+                                continue
+                    except OSError:
+                        continue
+                if found >= SEARCH_LIMIT:
+                    hit_limit = True
+                    break
+                found += 1
+                batch.append(fp)
+                if len(batch) >= SEARCH_BATCH:
+                    safe(self._append_results, list(batch))
+                    batch = []
+            if hit_limit:
+                break
+
+        if batch:
+            safe(self._append_results, batch)
+
+        return {"found": found, "limit": hit_limit, "cancelled": stop.is_set()}
+
+    def _append_results(self, paths):
+        self.srch_results.addItems(paths)
+
+    def _search_finished(self, result):
+        tr = self.tr
+        self._search_running = False
+        self.srch_btn.setText(tr("fileops_search_btn"))
+        n = result.get("found", 0)
+        if result.get("limit"):
+            self.srch_results.addItem(tr("fileops_search_limit").format(n=n))
+        elif result.get("cancelled"):
+            self.srch_results.addItem(tr("fileops_search_cancelled").format(n=n))
+        else:
+            self.srch_results.addItem(tr("fileops_found").format(n=n))
+
+    def _search_failed(self, error):
+        self._search_running = False
+        self.srch_btn.setText(self.tr("fileops_search_btn"))
+        self.srch_results.addItem(f"\u2717 {error}")
 
     def _build_organize(self, tabs):
         tr = self.tr
@@ -325,7 +411,8 @@ class FileOpsPage(PageWidget):
                 shutil.move(fp, final_dst)
                 self._organize_history.append((final_dst, path))
                 self.org_log.append(f"OK {f} -> {dest_dir}/")
-        log(EVENT_FILEOP, STATUS_OK, "organize", 1)
+        if not preview:
+            log(EVENT_FILEOP, STATUS_OK, "organize", 1)
 
     def _undo_organize(self):
         if not self._organize_history:

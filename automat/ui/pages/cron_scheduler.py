@@ -6,14 +6,15 @@ Fixed: tasks survive app restart (rescheduled on load).
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
-import threading, json, subprocess, datetime
-from config import ACCENT, GREEN, RED, TASKS_FILE
-from ui.page_base import PageWidget
-from ui.widgets import LogPanel
-from core.activity_log import log, EVENT_SCHEDULE, STATUS_OK, STATUS_ERROR
-from core.worker import run_in_background
-from config import load_proxy
-from util import safe
+import threading, subprocess, datetime, sys
+from automat.config import ACCENT, GREEN, RED, TASKS_FILE
+from automat.ui.page_base import PageWidget
+from automat.ui.widgets import LogPanel
+from automat.core.activity_log import log, EVENT_SCHEDULE, STATUS_OK, STATUS_ERROR
+from automat.core.worker import run_in_background
+from automat.core import json_io
+from automat.config import load_proxy
+from automat.util import safe
 
 try:
     from apscheduler.schedulers.background import BackgroundScheduler
@@ -155,8 +156,12 @@ class CronSchedulerPage(PageWidget):
             self.log_panel.write(f"Sched error: {e}", "err")
 
     def _add(self):
+        name = self.task_name.text().strip()
+        if not name:
+            self.log_panel.write("Enter task name", "warn")
+            return
         task = {
-            "name": self.task_name.text(),
+            "name": name,
             "type": self.task_type.currentText(),
             "path": self.task_path.text(),
             "trigger": self.task_trigger.currentText(),
@@ -199,7 +204,7 @@ class CronSchedulerPage(PageWidget):
         proxies = load_proxy(self.app.settings_data) if hasattr(self, 'app') and self.app else None
         try:
             if task["type"] == "script" and task["path"]:
-                subprocess.run(["python", task["path"]], timeout=60)
+                subprocess.run([sys.executable, task["path"]], timeout=60)
             elif task["type"] in ("http_get", "http_post") and task["path"]:
                 import requests
                 if task["type"] == "http_get":
@@ -258,18 +263,16 @@ class CronSchedulerPage(PageWidget):
         self._save()
 
     def _save(self):
-        try:
-            with open(TASKS_FILE, "w") as f:
-                json.dump(self.tasks, f, indent=2, ensure_ascii=False)
-        except Exception:
-            pass
+        json_io.save_json(TASKS_FILE, self.tasks)
 
     def _load(self):
-        try:
-            with open(TASKS_FILE) as f:
-                self.tasks = json.load(f)
-                for task in self.tasks:
-                    self._schedule_task(task)
-                self._refresh()
-        except Exception:
-            pass
+        tasks = json_io.load_json(TASKS_FILE, [])
+        if not isinstance(tasks, list):
+            return
+        self.tasks = tasks
+        for task in self.tasks:
+            try:
+                self._schedule_task(task)
+            except Exception as e:
+                self.log_panel.write(f"schedule failed: {task.get('name')}: {e}", "err")
+        self._refresh()

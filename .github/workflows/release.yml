@@ -5,28 +5,48 @@ on:
     tags:
       - "v*"
 
+permissions:
+  contents: write
+
 jobs:
-  release:
+  build-windows:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11" 
-      - name: Install dependencies 
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install package + pyinstaller
         run: |
-          pip install -r automat/requirements.txt
+          python -m pip install --upgrade pip
+          pip install -e .
           pip install pyinstaller
-      - name: Build .exe
+
+      - name: Smoke test (headless)
+        env:
+          QT_QPA_PLATFORM: offscreen
         run: |
-          cd automat
-          pyinstaller --onedir --windowed --name "AUTOMAT" --add-data "ui;ui" --add-data "core;core" main.py
-      - name: Create ZIP
+          python -m pytest tests/ -q
+
+      # Built from the repo root so the `automat` package resolves.
+      # --paths . guarantees modulegraph finds it; no --add-data needed
+      # because icons and QSS live in Python modules.
+      - name: Build AUTOMAT.exe
         run: |
-          Compress-Archive -Path automat/dist/AUTOMAT/ -DestinationPath AUTOMAT-${{ github.ref_name }}.zip
-      - name: Create Release
+          pyinstaller --noconfirm --clean --onedir --windowed --name "AUTOMAT" --paths . automat/main.py
+
+      - name: Pack artifact
+        shell: pwsh
+        run: |
+          Compress-Archive -Path dist/AUTOMAT/* -DestinationPath "AUTOMAT-${{ github.ref_name }}-windows.zip"
+
+      - name: Publish GitHub release
         uses: softprops/action-gh-release@v2
         with:
-          files: AUTOMAT-${{ github.ref_name }}.zip
+          files: AUTOMAT-${{ github.ref_name }}-windows.zip
           generate_release_notes: true
+          prerelease: ${{ contains(github.ref_name, 'b') || contains(github.ref_name, 'rc') || contains(github.ref_name, 'alpha') }}

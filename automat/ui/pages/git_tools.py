@@ -7,11 +7,11 @@ from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 import subprocess, os
-from config import ACCENT, GREEN, RED
-from ui.page_base import PageWidget
-from ui.widgets import LogPanel
-from core.worker import run_in_background
-from util import safe
+from automat.config import GREEN
+from automat.ui.page_base import PageWidget
+from automat.ui.widgets import LogPanel
+from automat.core.worker import run_in_background
+from automat.util import safe
 
 
 class GitToolsPage(PageWidget):

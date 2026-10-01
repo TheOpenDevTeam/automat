@@ -21,10 +21,10 @@ def temp_db(monkeypatch):
     tmp = tempfile.mkdtemp()
     db_path = Path(tmp) / "test_activity.db"
 
-    monkeypatch.setattr("core.activity_log._APP_DIR", Path(tmp))
-    monkeypatch.setattr("core.activity_log._DB_FILE", db_path)
+    monkeypatch.setattr("automat.core.activity_log._APP_DIR", Path(tmp))
+    monkeypatch.setattr("automat.core.activity_log._DB_FILE", db_path)
 
-    import core.activity_log as al
+    import automat.core.activity_log as al
     al._init()
     yield
 
@@ -45,7 +45,7 @@ def temp_db(monkeypatch):
 
 def test_log_and_get_totals():
     """Logging items with the same event type should accumulate correctly."""
-    from core.activity_log import log, get_totals, EVENT_CONVERT, STATUS_OK
+    from automat.core.activity_log import log, get_totals, EVENT_CONVERT, STATUS_OK
 
     log(EVENT_CONVERT, STATUS_OK, "test", 3)
     log(EVENT_CONVERT, STATUS_OK, "test2", 2)
@@ -56,7 +56,7 @@ def test_log_and_get_totals():
 
 def test_get_recent_events():
     """Recent events should be returned in reverse-chronological order."""
-    from core.activity_log import log, get_recent_events, EVENT_SEND, STATUS_OK
+    from automat.core.activity_log import log, get_recent_events, EVENT_SEND, STATUS_OK
 
     log(EVENT_SEND, STATUS_OK, "batch1", 10)
     events = get_recent_events(5)
@@ -67,7 +67,7 @@ def test_get_recent_events():
 
 def test_success_rate():
     """Success rate should be correct across OK and ERROR statuses."""
-    from core.activity_log import log, get_success_rate, EVENT_HASH, STATUS_OK, STATUS_ERROR
+    from automat.core.activity_log import log, get_success_rate, EVENT_HASH, STATUS_OK, STATUS_ERROR
 
     log(EVENT_HASH, STATUS_OK, "ok1", 1)
     log(EVENT_HASH, STATUS_OK, "ok2", 1)

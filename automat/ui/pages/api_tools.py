@@ -3,7 +3,6 @@ API Client page — REST client, JSON/YAML/XML formatter with validation,
 pretty-printing, minification, and JSONPath queries.
 """
 
-import threading
 import json
 import re
 
@@ -11,9 +10,9 @@ from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 
-from config import ACCENT, GREEN, YELLOW, RED
-from ui.page_base import PageWidget
-from util import safe
+from automat.config import GREEN, YELLOW, RED
+from automat.ui.page_base import PageWidget
+from automat.core.worker import run_in_background
 
 try:
     import requests
@@ -27,12 +26,8 @@ try:
 except ImportError:
     HAS_YAML = False
 
-try:
-    import xml.etree.ElementTree as ET
-    from xml.dom import minidom
-    HAS_XML = True
-except ImportError:
-    HAS_XML = False
+import xml.etree.ElementTree as ET
+from xml.dom import minidom
 
 
 class ApiToolsPage(PageWidget):
@@ -105,42 +100,54 @@ class ApiToolsPage(PageWidget):
         if not HAS_REQUESTS:
             QMessageBox.warning(self, "Error", self.app.i18n.tr("api_no_requests"))
             return
-        threading.Thread(target=self._do_request, daemon=True).start()
-
-    def _do_request(self):
         method = self.method.currentText().lower()
         url = self.url.text()
         try:
-            headers = (
-                json.loads(self.headers_input.toPlainText())
-                if self.headers_input.toPlainText()
-                else {}
-            )
+            headers = json.loads(self.headers_input.toPlainText()) if self.headers_input.toPlainText() else {}
         except Exception:
             headers = {}
         try:
-            body = (
-                json.loads(self.body_input.toPlainText())
-                if self.body_input.toPlainText()
-                else None
-            )
+            body = json.loads(self.body_input.toPlainText()) if self.body_input.toPlainText() else None
         except Exception:
             body = self.body_input.toPlainText()
 
-        try:
-            r = requests.request(method, url, json=body, headers=headers, timeout=30)
-            raw = r.text
-            if raw[:1] in ("{", "["):
-                try:
-                    raw = json.dumps(r.json(), indent=2, ensure_ascii=False)
-                except Exception:
-                    pass
-            safe(self.response.setPlainText, raw)
-            color = GREEN if r.ok else RED
-            safe(self._set_api_status, f"{r.status_code} {r.reason} ({len(r.content)} bytes)", color)
-        except Exception as e:
-            safe(self.response.setPlainText, str(e))
-            safe(self._set_api_status, f"Error: {e}", RED)
+        self.status_lbl.setText("Sending...")
+        self.status_lbl.setProperty("status_color", YELLOW)
+        self.status_lbl.style().unpolish(self.status_lbl)
+        self.status_lbl.style().polish(self.status_lbl)
+
+        run_in_background(
+            self._do_request_bg, method, url, headers, body,
+            on_result=self._on_request_done,
+            on_error=lambda e: self._on_request_error(str(e)),
+        )
+
+    def _do_request_bg(self, method, url, headers, body):
+        r = requests.request(method, url, json=body, headers=headers, timeout=30)
+        return {
+            "text": r.text,
+            "status_code": r.status_code,
+            "reason": r.reason,
+            "content_len": len(r.content),
+            "ok": r.ok,
+        }
+
+    def _on_request_done(self, result):
+        raw = result["text"]
+        if raw[:1] in ("{", "["):
+            try:
+                raw = json.dumps(json.loads(raw), indent=2, ensure_ascii=False)
+            except Exception:
+                pass
+        self.response.setPlainText(raw)
+        color = GREEN if result["ok"] else RED
+        self._set_api_status(
+            f"{result['status_code']} {result['reason']} ({result['content_len']} bytes)",
+            color)
+
+    def _on_request_error(self, error):
+        self.response.setPlainText(error)
+        self._set_api_status(f"Error: {error}", RED)
 
     def _build_formatter(self, tabs):
         tr = self.app.i18n.tr
@@ -196,7 +203,8 @@ class ApiToolsPage(PageWidget):
         self.fmt_status.style().unpolish(self.fmt_status)
         self.fmt_status.style().polish(self.fmt_status)
 
-    def _detect_format(self, text: str) -> str | None:
+    def _detect_format(self, text):
+
         stripped = text.strip()
         if not stripped:
             return None
@@ -216,7 +224,8 @@ class ApiToolsPage(PageWidget):
                 pass
         return None
 
-    def _get_format(self) -> str | None:
+    def _get_format(self):
+
         choice = self.format_combo.currentText()
         if choice == "Auto-detect":
             text = self.fmt_input.toPlainText()
@@ -243,15 +252,12 @@ class ApiToolsPage(PageWidget):
                 else:
                     self._set_fmt_status("YAML support requires PyYAML: pip install pyyaml", YELLOW)
             elif fmt == "xml":
-                if HAS_XML:
-                    ET.fromstring(text)
-                    self._set_fmt_status("Valid XML", GREEN)
-                    self.fmt_output.clear()
-                else:
-                    self._set_fmt_status("XML module not available.", YELLOW)
+                ET.fromstring(text)
+                self._set_fmt_status("Valid XML", GREEN)
+                self.fmt_output.clear()
             else:
                 self._set_fmt_status("Could not detect format. Try selecting it manually.", YELLOW)
-        except (json.JSONDecodeError, yaml.YAMLError, ET.ParseError) as e:
+        except Exception as e:
             self._set_fmt_status(f"Invalid: {e}", RED)
 
     def _pretty(self):
@@ -275,15 +281,11 @@ class ApiToolsPage(PageWidget):
                     self.fmt_output.setPlainText(text)
                     self._set_fmt_status("YAML pretty-print requires PyYAML", YELLOW)
             elif fmt == "xml":
-                if HAS_XML:
-                    dom = minidom.parseString(text)
-                    pretty = dom.toprettyxml(indent="  ")
-                    pretty = "\n".join(pretty.split("\n")[1:])
-                    self.fmt_output.setPlainText(pretty)
-                    self._set_fmt_status("Formatted successfully", GREEN)
-                else:
-                    self.fmt_output.setPlainText(text)
-                    self._set_fmt_status("XML pretty-print requires xml.dom.minidom", YELLOW)
+                dom = minidom.parseString(text)
+                pretty = dom.toprettyxml(indent="  ")
+                pretty = "\n".join(pretty.split("\n")[1:])
+                self.fmt_output.setPlainText(pretty)
+                self._set_fmt_status("Formatted successfully", GREEN)
             else:
                 self._set_fmt_status("Could not detect format.", YELLOW)
         except Exception as e:
@@ -310,14 +312,10 @@ class ApiToolsPage(PageWidget):
                     self.fmt_output.setPlainText(text)
                     self._set_fmt_status("YAML minify requires PyYAML", YELLOW)
             elif fmt == "xml":
-                if HAS_XML:
-                    dom = minidom.parseString(text)
-                    compressed = dom.toxml()
-                    self.fmt_output.setPlainText(compressed)
-                    self._set_fmt_status(f"Minified ({len(text)} \u2192 {len(compressed)} chars)", GREEN)
-                else:
-                    self.fmt_output.setPlainText(text)
-                    self._set_fmt_status("XML minify requires xml.dom.minidom", YELLOW)
+                dom = minidom.parseString(text)
+                compressed = dom.toxml()
+                self.fmt_output.setPlainText(compressed)
+                self._set_fmt_status(f"Minified ({len(text)} \u2192 {len(compressed)} chars)", GREEN)
             else:
                 self._set_fmt_status("Could not detect format.", YELLOW)
         except Exception as e:

@@ -6,15 +6,15 @@ All styles are handled via objectName + QSS in config.py.
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
-from ui.icons import pixmap as icon_pixmap
+from automat.ui.icons import pixmap as icon_pixmap
 
 
 class PageWidget(QWidget):
     def __init__(self, app=None):
         super().__init__()
         self.app = app
-        self.layout = QVBoxLayout(self)
-        self.layout.setContentsMargins(0, 0, 0, 0)
+        self.main_layout = QVBoxLayout(self)
+        self.main_layout.setContentsMargins(0, 0, 0, 0)
         self.scroll = QScrollArea()
         self.scroll.setWidgetResizable(True)
         self.scroll.setFrameShape(QFrame.NoFrame)
@@ -25,7 +25,7 @@ class PageWidget(QWidget):
         self.content_layout.setContentsMargins(32, 28, 32, 28)
         self.content_layout.setSpacing(16)
         self.scroll.setWidget(self.content)
-        self.layout.addWidget(self.scroll)
+        self.main_layout.addWidget(self.scroll)
 
     def header(self, icon_name, title, subtitle=""):
         h_layout = QHBoxLayout()

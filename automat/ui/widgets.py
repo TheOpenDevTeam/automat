@@ -1,7 +1,7 @@
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
-from config import ACCENT, ACCENT2, GREEN, RED, YELLOW
+from automat.config import ACCENT, ACCENT2, GREEN, RED, YELLOW
 
 
 class Toast(QWidget):
@@ -56,36 +56,22 @@ class LogPanel(QWidget):
         self.log.setReadOnly(True)
         self.log.setMaximumBlockCount(500)
         layout.addWidget(self.log)
-        self._colors = {"ok": GREEN, "err": RED, "warn": YELLOW, "info": ACCENT}
+        self._dark_colors = {"ok": GREEN, "err": RED, "warn": YELLOW, "info": ACCENT}
+        self._light_colors = {"ok": "#1a7f4a", "err": "#c5221f", "warn": "#9a6700", "info": "#1a5fb4"}
 
     def write(self, msg, tag="ok"):
-        color = self._colors.get(tag, "#94a3b8")
         ts = QDateTime.currentDateTime().toString("HH:mm:ss")
+        try:
+            from automat.ui.icons import is_dark
+            dark = is_dark()
+        except Exception:
+            dark = True
+        colors = self._dark_colors if dark else self._light_colors
+        color = colors.get(tag, colors["info"])
         self.log.appendHtml(f'<span style="color: {color};">[{ts}] {msg}</span>')
 
     def clear(self):
         self.log.clear()
-
-
-class Card(QFrame):
-    def __init__(self, title="", parent=None):
-        super().__init__(parent)
-        self.setObjectName("card")
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(16, 16, 16, 16)
-        if title:
-            lbl = QLabel(title)
-            lbl.setObjectName("card_title")
-            layout.addWidget(lbl)
-            sep = QFrame()
-            sep.setFrameShape(QFrame.HLine)
-            sep.setObjectName("card_separator")
-            layout.addWidget(sep)
-        self.inner = QWidget()
-        self.inner.setStyleSheet("background: transparent;")
-        self.inner_layout = QVBoxLayout(self.inner)
-        self.inner_layout.setContentsMargins(0, 0, 0, 0)
-        layout.addWidget(self.inner)
 
 
 class SidebarButton(QPushButton):
@@ -96,7 +82,7 @@ class SidebarButton(QPushButton):
         self.setCheckable(True)
         self.setObjectName("sidebar_btn")
         self.setCursor(Qt.PointingHandCursor)
-        self.setMinimumHeight(42)
+        self.setMinimumHeight(36)
 
 
 class ProgressBar(QProgressBar):
@@ -108,21 +94,12 @@ class ProgressBar(QProgressBar):
         self.setTextVisible(False)
 
 
-class IconButton(QPushButton):
-    def __init__(self, icon_char, text="", parent=None):
-        t = icon_char if not text else f"{icon_char}  {text}"
-        super().__init__(t, parent)
-        self.setCursor(Qt.PointingHandCursor)
-        self.setMinimumHeight(36)
-        self.setObjectName("icon_btn")
-
-
 class SkeletonBlock(QFrame):
     """Animated placeholder block that shows while content is loading."""
     def __init__(self, width=80, height=20, rounded=6, parent=None):
         super().__init__(parent)
         self.setFixedSize(width, height)
-        self._base_color = QColor("#1a2340")
+        self._offset_val = 0.0
         self._offset = 0
         self._anim = QPropertyAnimation(self, b"_offset")
         self._anim.setDuration(1500)
@@ -152,14 +129,21 @@ class SkeletonBlock(QFrame):
         self.update()
 
     def paintEvent(self, event):
+        from automat.ui.icons import is_dark as _icons_dark
+        try:
+            dark = _icons_dark()
+        except Exception:
+            dark = True
+        base = QColor("#35383e") if dark else QColor("#e2e5ea")
+        hi = QColor("#4a4f57") if dark else QColor("#c9cfd8")
         p = QPainter(self)
         p.setRenderHint(QPainter.Antialiasing)
         w, h = self.width(), self.height()
-        phase = self._offset_val
+        phase = getattr(self, "_offset_val", 0.0)
         grad = QLinearGradient(0, 0, w, 0)
-        grad.setColorAt(max(0, phase - 0.4), self._base_color)
-        grad.setColorAt(phase, QColor("#2a3555"))
-        grad.setColorAt(min(1, phase + 0.4), self._base_color)
+        grad.setColorAt(max(0, phase - 0.4), base)
+        grad.setColorAt(phase, hi)
+        grad.setColorAt(min(1, phase + 0.4), base)
         p.setBrush(QBrush(grad))
         p.setPen(Qt.NoPen)
         p.drawRoundedRect(0, 0, w, h, 6, 6)

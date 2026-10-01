@@ -19,6 +19,7 @@ settings.json
 tasks.json
 activity.db
 *.bak
+*.log
 
 # OS
 .DS_Store

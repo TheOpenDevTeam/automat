@@ -1,10 +1,10 @@
 # ⚡ AUTOMAT — Task Automation Manager
 
-[![CI](https://github.com/OpenDev/automat/actions/workflows/test.yml/badge.svg)](https://github.com/OpenDev/automat/actions)
+[![CI](https://github.com/TheOpenDevTeam/automat/actions/workflows/test.yml/badge.svg)](https://github.com/TheOpenDevTeam/automat/actions)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
 
-**AUTOMAT** is a powerful open-source task automation tool with a modern PyQt5 graphical interface. Built by [**OpenDev**](https://github.com/OpenDev) — a startup of independent developers creating free and secure open-source applications.
+**AUTOMAT** is a powerful open-source task automation tool with a modern PyQt5 graphical interface. Built by [**OpenDev**](https://github.com/TheOpenDevTeam) — a startup of independent developers creating free and secure open-source applications.
 
 ---
 
@@ -36,6 +36,18 @@
 | **System Monitor** | Real-time CPU, RAM, Disk monitoring with PyQtChart graphs |
 | **Snippets** | Code/template storage with category organization |
 
+### v2.0+ NEW features
+
+| Feature | Description |
+|---------|-------------|
+| **Global Search** | Search across all tools, settings, and activity log (Ctrl+Shift+F) |
+| **Operation History** | Full timeline with filtering, pagination, and CSV/JSON export |
+| **Custom Theme Builder** | Create, edit, import/export custom color themes with live preview |
+| **Bookmarks** | Favorite pages for quick access via sidebar (Ctrl+D) |
+| **Drag & Drop** | Drop files on the window — auto-detects type and opens the right tool |
+| **Settings Export/Import** | Backup and restore all settings, bookmarks, and preferences (Ctrl+Shift+E/I) |
+| **Check for Updates** | One-click update check via GitHub releases API (Ctrl+U) |
+
 ### UI / UX
 
 - Dark and light themes with smooth toggle
@@ -46,6 +58,9 @@
 - Toast notification system
 - i18n: Russian and English interface
 - Window geometry persistence
+- Global search (Ctrl+Shift+F)
+- Bookmarks system (Ctrl+D)
+- Drag & drop file support
 
 ---
 
@@ -53,15 +68,17 @@
 
 ```bash
 # Clone the repository
-git clone https://github.com/OpenDev/automat.git
+git clone https://github.com/TheOpenDevTeam/automat.git
 cd automat
 
-# Install dependencies
-pip install -r automat/requirements.txt
+# Install (editable, recommended)
+pip install -e .
 
 # Run
-cd automat
-python main.py
+python -m automat.main
+
+# Or run the test suite
+QT_QPA_PLATFORM=offscreen pytest tests/ -q
 ```
 
 ### System requirements
@@ -77,17 +94,32 @@ python main.py
 ```
 automat/
 ├── core/                  # Business logic layer
-│   ├── activity_log.py    # SQLite activity logger
-│   └── app_logger.py      # Structured logging
+│   ├── activity_log.py    # SQLite activity logger + export/search
+│   ├── app_logger.py      # Structured logging
+│   ├── calc_manager.py    # Calculator logic
+│   ├── clipboard_history.py # Clipboard history store + monitor
+│   ├── clock_manager.py   # Clock timer
+│   ├── db.py              # Shared SQLite plumbing (WAL, retry)
+│   ├── json_io.py         # JSON persistence (quarantine, atomic save)
+│   ├── theme_manager.py   # Theme switching
+│   └── worker.py          # Background task runner
 ├── ui/
-│   ├── pages/             # 16 application pages
+│   ├── pages/             # 22 application pages
+│   │   ├── dash.py        # Dashboard
+│   │   ├── search_page.py # Global search
+│   │   ├── history_page.py# Operation history
+│   │   ├── theme_builder.py# Theme builder
+│   │   ├── clipboard_page.py # Clipboard history
+│   │   ├── extra_tools.py # QR / color picker / curl converter
+│   │   └── ...            # Other pages
 │   ├── page_base.py       # Base page class
-│   └── widgets.py         # Reusable UI components
+│   ├── widgets.py         # Reusable UI components
+│   └── icons.py           # Icon system
 ├── app.py                 # Main window (QMainWindow)
 ├── config.py              # QSS themes, colors, app config
 ├── i18n.py                # i18n system (RU/EN)
-├── main.py                # Entry point
-└── requirements.txt       # Dependencies
+├── main.py                # Entry point (`python -m automat.main`)
+└── util.py                # GUI-thread marshaller
 ```
 
 ---

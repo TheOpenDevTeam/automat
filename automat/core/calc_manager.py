@@ -60,8 +60,12 @@ class CalcManager:
                     if op == '*':
                         val *= right
                     elif op == '/':
+                        if right == 0:
+                            raise ZeroDivisionError("Division by zero")
                         val /= right
                     elif op == '%':
+                        if right == 0:
+                            raise ZeroDivisionError("Division by zero")
                         val %= right
                 else:
                     break
@@ -100,7 +104,14 @@ class CalcManager:
                 j = i
                 while j < len(text) and (text[j].isdigit() or text[j] == '.'):
                     j += 1
-                tokens.append(('num', text[i:j]))
+                num_str = text[i:j]
+                if num_str.count('.') > 1 or num_str == '.':
+                    raise ValueError(f"Invalid number: {num_str}")
+                try:
+                    float(num_str)
+                except ValueError:
+                    raise ValueError(f"Invalid number: {num_str}")
+                tokens.append(('num', num_str))
                 i = j
                 continue
             if ch in '+-*/()%':

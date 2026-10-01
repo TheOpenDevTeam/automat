@@ -6,12 +6,12 @@ Fixed: Worker pattern, confirmation dialog, thread-safety.
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
-import os, csv
-from config import ACCENT, GREEN, RED
-from ui.page_base import PageWidget
-from ui.widgets import LogPanel, ProgressBar, ValidatedLineEdit
-from core.activity_log import log, EVENT_CONVERT, STATUS_OK, STATUS_ERROR
-from core.worker import run_in_background
+import os
+from automat.config import ACCENT, GREEN, RED
+from automat.ui.page_base import PageWidget
+from automat.ui.widgets import LogPanel, ProgressBar, ValidatedLineEdit
+from automat.core.activity_log import log, EVENT_CONVERT, STATUS_OK, STATUS_ERROR
+from automat.core.worker import run_in_background
 
 try:
     from reportlab.lib.pagesizes import A4
@@ -178,7 +178,7 @@ class ConvertProPage(PageWidget):
         self.progress.setValue(100)
 
     def _run(self):
-        from util import safe
+        from automat.util import safe
         out = self.out_path.text()
         conv = self.conv_type.currentText()
         total = len(self.files)
@@ -197,12 +197,12 @@ class ConvertProPage(PageWidget):
                         continue
                     wb = load_workbook(f)
                     ws = wb.active
-                    c = canvas.Canvas(dst + ".pdf", pagesize=A4)
+                    cv = canvas.Canvas(dst + ".pdf", pagesize=A4)
                     y = 800
                     for row in ws.iter_rows(values_only=True):
-                        c.drawString(40, y, "  ".join(str(c or "") for c in row))
+                        cv.drawString(40, y, "  ".join(str(cell or "") for cell in row))
                         y -= 20
-                    c.save()
+                    cv.save()
                 elif "PDF \u2192 Word" in conv and ext == ".pdf":
                     if not HAS_PDF2DOCX:
                         safe(self.log_panel.write, "\u2717 install: pip install pdf2docx", "err")
@@ -226,7 +226,7 @@ class ConvertProPage(PageWidget):
                         safe(self.log_panel.write, "\u2717 install: pip install pdfplumber", "err")
                         continue
                     with pdfplumber.open(f) as pdf:
-                        text = "\n".join(p.page_text for p in pdf.pages)
+                        text = "\n".join(p.extract_text() or "" for p in pdf.pages)
                     with open(dst + ".txt", "w", encoding="utf-8") as tf:
                         tf.write(text)
                 elif "CSV \u2192 Excel" in conv and ext == ".csv":

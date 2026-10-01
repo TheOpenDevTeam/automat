@@ -94,6 +94,15 @@ _SVG_BODIES = {
         '<circle cx="12" cy="12" r="3"/>'
         '<path d="M12 1v2M12 21v2M1 12h2M21 12h2M5.64 5.64l1.41 1.41M16.95 16.95l1.41 1.41M5.64 18.36l1.41-1.41M16.95 7.05l1.41-1.41"/>'
     ),
+    "tools": (
+        '<path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/>'
+    ),
+    "clipboard": (
+        '<rect x="8" y="2" width="8" height="4" rx="1"/>'
+        '<path d="M16 4h2a2 2 0 012 2v14a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h2"/>'
+        '<line x1="9" y1="12" x2="15" y2="12"/>'
+        '<line x1="9" y1="16" x2="13" y2="16"/>'
+    ),
 }
 
 
@@ -161,3 +170,8 @@ def set_theme(is_dark: bool):
     global _COLOR
     _COLOR = "#e2e8f0" if is_dark else _LIGHT_COLOR
     _cache.clear()
+
+
+def is_dark() -> bool:
+    """Current icon theme flag (True = dark)."""
+    return _COLOR == "#e2e8f0"
