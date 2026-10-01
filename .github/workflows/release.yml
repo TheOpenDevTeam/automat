@@ -24,7 +24,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -e .
-          pip install pyinstaller
+          pip install pyinstaller pytest
 
       - name: Smoke test (headless)
         env:
