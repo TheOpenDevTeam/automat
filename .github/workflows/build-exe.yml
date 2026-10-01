@@ -1,12 +1,13 @@
-name: Release
+name: Build EXE
+
+# Builds AUTOMAT.exe on every push to main and on demand.
+# The zip is stored as a workflow artifact (no GitHub release is created).
+# Download it from the Actions tab -> Build EXE -> Artifacts.
 
 on:
   push:
-    tags:
-      - "v*"
-
-permissions:
-  contents: write
+    branches: [main]
+  workflow_dispatch:
 
 jobs:
   build-windows:
@@ -42,11 +43,10 @@ jobs:
       - name: Pack artifact
         shell: pwsh
         run: |
-          Compress-Archive -Path dist/AUTOMAT/* -DestinationPath "AUTOMAT-${{ github.ref_name }}-windows.zip"
+          Compress-Archive -Path dist/AUTOMAT/* -DestinationPath "AUTOMAT-windows.zip"
 
-      - name: Publish GitHub release
-        uses: softprops/action-gh-release@v2
+      - name: Upload EXE
+        uses: actions/upload-artifact@v4
         with:
-          files: AUTOMAT-${{ github.ref_name }}-windows.zip
-          generate_release_notes: true
-          prerelease: ${{ contains(github.ref_name, 'b') || contains(github.ref_name, 'rc') || contains(github.ref_name, 'alpha') }}
+          name: AUTOMAT-windows
+          path: AUTOMAT-windows.zip

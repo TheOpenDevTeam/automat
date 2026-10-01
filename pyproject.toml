@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "automat"
-version = "2.0b1"
+version = "1.0b1"
 description = "Task Automation Manager — open-source инструмент для автоматизации с расширенным функционалом"
 readme = "README.md"
 license = {text = "GPL-3.0-only"}

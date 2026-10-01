@@ -13,7 +13,7 @@ def _app_version() -> str:
         from importlib.metadata import PackageNotFoundError, version
         return version("automat")
     except Exception:
-        return "2.0b1"
+        return "1.0b1"
 
 
 APP_VERSION = _app_version()

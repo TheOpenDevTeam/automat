@@ -147,8 +147,8 @@ class TestI18n:
     def test_format_string(self):
         from automat.i18n import I18n
         i18n = I18n("ru")
-        result = i18n.tr("app_subtitle", version="2.0")
-        assert result == "v2.0"
+        result = i18n.tr("app_subtitle", version="1.0")
+        assert result == "v1.0"
 
     def test_fallback_to_ru(self):
         from automat.i18n import I18n

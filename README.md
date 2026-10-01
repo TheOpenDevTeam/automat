@@ -26,7 +26,7 @@
 | **Text Tools** | UPPER/lower/Title transform, sort, dedup, search/replace, word stats |
 | **Regex Tester** | Live regex matching with flag toggles and group capture display |
 
-### v2.0 modules
+### v1.0 modules
 
 | Tool | Description |
 |------|-------------|
@@ -36,7 +36,7 @@
 | **System Monitor** | Real-time CPU, RAM, Disk monitoring with PyQtChart graphs |
 | **Snippets** | Code/template storage with category organization |
 
-### v2.0+ NEW features
+### v1.0 features
 
 | Feature | Description |
 |---------|-------------|
