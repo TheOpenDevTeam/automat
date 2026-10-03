@@ -1,8 +1,8 @@
 name: Build EXE
 
-# Builds AUTOMAT.exe on every push to main and on demand.
-# The zip is stored as a workflow artifact (no GitHub release is created).
-# Download it from the Actions tab -> Build EXE -> Artifacts.
+# Builds the Windows installer on every push to main and on demand.
+# AUTOMAT-Setup-*.exe is stored as a workflow artifact (no GitHub
+# release is created). Download it from Actions -> Build EXE -> Artifacts.
 
 on:
   push:
@@ -40,13 +40,16 @@ jobs:
         run: |
           pyinstaller --noconfirm --clean --onedir --windowed --name "AUTOMAT" --paths . automat/main.py
 
-      - name: Pack artifact
-        shell: pwsh
+      - name: Install Inno Setup
         run: |
-          Compress-Archive -Path dist/AUTOMAT/* -DestinationPath "AUTOMAT-windows.zip"
+          choco install innosetup -y --no-progress
 
-      - name: Upload EXE
+      - name: Build installer
+        run: |
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer\automat.iss
+
+      - name: Upload installer
         uses: actions/upload-artifact@v4
         with:
-          name: AUTOMAT-windows
-          path: AUTOMAT-windows.zip
+          name: AUTOMAT-Setup
+          path: installer/Output/AUTOMAT-Setup-*.exe
