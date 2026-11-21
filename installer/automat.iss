@@ -4,7 +4,7 @@
 ;   ISCC.exe installer\automat.iss
 ; Version is intentionally hardcoded to match pyproject.toml.
 
-#define AppVersion "1.0b1"
+#define AppVersion "1.0.0"
 
 [Setup]
 AppId={{E9CD11D7-BA99-4BC8-8D23-6FA83248065B}
