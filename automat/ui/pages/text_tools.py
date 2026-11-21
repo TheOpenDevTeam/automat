@@ -1,12 +1,9 @@
 """
-Text Tools page — text transformation, search/replace, word statistics,
-and a dedicated regular expression tester with live matching.
-Fixed: undo/redo preserved for all transforms via cursor operations.
+Text Tools page — UI layer only.
+Business logic lives in automat.core.text_processor.TextProcessor.
 """
 
-import re
 import os
-import collections
 
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
@@ -14,9 +11,13 @@ from PyQt5.QtGui import *
 
 from automat.ui.page_base import PageWidget
 from automat.core.activity_log import log, EVENT_TEXT, STATUS_OK
+from automat.core.text_processor import TextProcessor
 
 # Read at most this much of a dropped file so a huge log can't freeze the GUI.
 DROP_READ_LIMIT = 5 * 1024 * 1024
+
+# Warn above this size when loading a file into the editor.
+LARGE_FILE_WARN = 50 * 1024 * 1024  # 50 MB
 
 
 class TextToolsPage(PageWidget):
@@ -24,6 +25,7 @@ class TextToolsPage(PageWidget):
 
     def __init__(self, app):
         super().__init__(app)
+        self.processor = TextProcessor()
         self.build()
 
     def build(self):
@@ -55,14 +57,14 @@ class TextToolsPage(PageWidget):
             "Remove duplicate lines", "Reverse line order",
         ]
         for (txt, fn), tip in zip([
-            ("UPPER", lambda: self._transform(str.upper)),
-            ("lower", lambda: self._transform(str.lower)),
-            ("Title", lambda: self._transform(str.title)),
-            ("Strip", lambda: self._transform(str.strip)),
-            ("Sort\u2191", lambda: self._sort(True)),
-            ("Sort\u2193", lambda: self._sort(False)),
-            ("Dedup", self._dedup),
-            ("Reverse", self._reverse),
+            ("UPPER", lambda: self._apply_transform(str.upper)),
+            ("lower", lambda: self._apply_transform(str.lower)),
+            ("Title", lambda: self._apply_transform(str.title)),
+            ("Strip", lambda: self._apply_transform(str.strip)),
+            ("Sort\u2191", lambda: self._sort_lines(True)),
+            ("Sort\u2193", lambda: self._sort_lines(False)),
+            ("Dedup", self._dedup_lines),
+            ("Reverse", self._reverse_text),
         ], tooltips):
             b = QPushButton(txt)
             b.setMinimumWidth(52)
@@ -150,6 +152,10 @@ class TextToolsPage(PageWidget):
 
         tabs.addTab(w, tr("text_editor_tab"))
 
+    # ------------------------------------------------------------------
+    # Text transformations (delegated to TextProcessor)
+    # ------------------------------------------------------------------
+
     def _replace_content(self, new_text: str):
         """Replace all editor content while preserving undo history."""
         cursor = self.editor.textCursor()
@@ -158,50 +164,45 @@ class TextToolsPage(PageWidget):
         cursor.insertText(new_text)
         cursor.endEditBlock()
 
-    def _transform(self, func):
+    def _apply_transform(self, func):
         text = self.editor.toPlainText()
-        self._replace_content(func(text))
+        self._replace_content(self.processor.transform(text, func))
 
-    def _sort(self, asc):
-        lines = self.editor.toPlainText().splitlines()
-        lines.sort(reverse=not asc)
-        self._replace_content("\n".join(lines))
+    def _sort_lines(self, asc):
+        text = self.editor.toPlainText()
+        self._replace_content(self.processor.sort_lines(text, asc))
 
-    def _dedup(self):
-        seen = []
-        for line in self.editor.toPlainText().splitlines():
-            if line not in seen:
-                seen.append(line)
-        self._replace_content("\n".join(seen))
+    def _dedup_lines(self):
+        text = self.editor.toPlainText()
+        self._replace_content(self.processor.dedup_lines(text))
 
-    def _reverse(self):
-        self._replace_content(self.editor.toPlainText()[::-1])
+    def _reverse_text(self):
+        text = self.editor.toPlainText()
+        self._replace_content(self.processor.reverse_text(text))
+
+    # ------------------------------------------------------------------
+    # Find / Replace
+    # ------------------------------------------------------------------
 
     def _find(self):
         text = self.find_text.text()
         if not text:
             return
         content = self.editor.toPlainText()
-        flags = re.IGNORECASE if not self.regex_cb.isChecked() else 0
-        if self.regex_cb.isChecked():
-            try:
-                pattern = re.compile(text, flags)
-                matches = pattern.findall(content)
-            except re.error:
-                return
-        else:
-            pattern = re.compile(re.escape(text), flags)
-            matches = pattern.findall(content)
-        count = len(matches)
+        result = self.processor.find(
+            content, text,
+            regex=self.regex_cb.isChecked(),
+            ignore_case=not self.regex_cb.isChecked(),
+        )
         self.editor.setExtraSelections([])
-        if count == 0:
+        if result.count == 0:
             return
         selections = []
-        for m in pattern.finditer(content):
+        for start, end in result.matches:
             sel = QTextEdit.ExtraSelection()
             sel.cursor = self.editor.textCursor()
-            sel.cursor.setPosition(m.start())
-            sel.cursor.setPosition(m.end(), QTextCursor.KeepAnchor)
+            sel.cursor.setPosition(start)
+            sel.cursor.setPosition(end, QTextCursor.KeepAnchor)
             sel.format.setBackground(QColor(80, 130, 220, 60))
             selections.append(sel)
         self.editor.setExtraSelections(selections)
@@ -212,39 +213,54 @@ class TextToolsPage(PageWidget):
         if not find_text:
             return
         content = self.editor.toPlainText()
-        flags = re.IGNORECASE if not self.regex_cb.isChecked() else 0
-        if self.regex_cb.isChecked():
-            try:
-                result = re.sub(find_text, replace_text, content, flags=flags)
-            except re.error:
-                return
-        else:
-            result = content.replace(find_text, replace_text)
+        result = self.processor.replace(
+            content, find_text, replace_text,
+            regex=self.regex_cb.isChecked(),
+            ignore_case=not self.regex_cb.isChecked(),
+        )
         self._replace_content(result)
+
+    # ------------------------------------------------------------------
+    # Statistics
+    # ------------------------------------------------------------------
 
     def _update_stats(self):
         text = self.editor.toPlainText()
-        chars = len(text)
-        words = len(text.split()) if text.strip() else 0
-        lines = text.count("\n") + (1 if text else 0)
-        unique = len(set(text.split())) if text.strip() else 0
-        if hasattr(self, 'stats_labels'):
-            self.stats_labels["Chars"].setText(f"{self.app.i18n.tr('text_chars_label')}: {chars}")
-            self.stats_labels["Words"].setText(f"{self.app.i18n.tr('text_words_label')}: {words}")
-            self.stats_labels["Lines"].setText(f"{self.app.i18n.tr('text_lines_label')}: {lines}")
-            self.stats_labels["Unique words"].setText(f"{self.app.i18n.tr('text_unique_words_label')}: {unique}")
-            counter = collections.Counter(text.split())
-            self.word_stats.clear()
-            for word, count in counter.most_common(20):
-                self.word_stats.addItem(f"{word}: {count}")
+        stats = self.processor.stats(text)
+        tr = self.app.i18n.tr
+        self.stats_labels["Chars"].setText(f"{tr('text_chars_label')}: {stats.chars}")
+        self.stats_labels["Words"].setText(f"{tr('text_words_label')}: {stats.words}")
+        self.stats_labels["Lines"].setText(f"{tr('text_lines_label')}: {stats.lines}")
+        self.stats_labels["Unique words"].setText(f"{tr('text_unique_words_label')}: {stats.unique_words}")
+        self.word_stats.clear()
+        for word, count in stats.top_words:
+            self.word_stats.addItem(f"{word}: {count}")
+
+    # ------------------------------------------------------------------
+    # File load / save
+    # ------------------------------------------------------------------
 
     def _load_file(self):
-        fp, _ = QFileDialog.getOpenFileName(self, self.app.i18n.tr("text_load"), "", "Text (*.txt);;All files (*.*)")
+        fp, _ = QFileDialog.getOpenFileName(
+            self, self.app.i18n.tr("text_load"), "",
+            "Text (*.txt);;All files (*.*)")
         if fp:
             self._load_path(fp)
 
     def _load_path(self, fp):
         try:
+            file_size = os.path.getsize(fp)
+            if file_size > LARGE_FILE_WARN:
+                from PyQt5.QtWidgets import QMessageBox
+                reply = QMessageBox.warning(
+                    self, self.app.i18n.tr("common_error"),
+                    f"File is {file_size / 1024 / 1024:.1f} MB. "
+                    f"Only the first {DROP_READ_LIMIT / 1024 / 1024:.0f} MB will be loaded. Continue?",
+                    QMessageBox.Yes | QMessageBox.No,
+                    QMessageBox.No,
+                )
+                if reply != QMessageBox.Yes:
+                    return False
             with open(fp, encoding="utf-8", errors="ignore") as f:
                 self._replace_content(f.read(DROP_READ_LIMIT))
             log(EVENT_TEXT, STATUS_OK, fp, 1)
@@ -263,7 +279,9 @@ class TextToolsPage(PageWidget):
             self.app.toast(f"+1")
 
     def _save_file(self):
-        fp, _ = QFileDialog.getSaveFileName(self, self.app.i18n.tr("text_save"), "", "Text (*.txt);;All files (*.*)")
+        fp, _ = QFileDialog.getSaveFileName(
+            self, self.app.i18n.tr("text_save"), "",
+            "Text (*.txt);;All files (*.*)")
         if fp:
             try:
                 with open(fp, "w", encoding="utf-8") as f:
@@ -326,11 +344,6 @@ class TextToolsPage(PageWidget):
         test_text = self.regex_input.toPlainText()
         self.regex_output.clear()
 
-        if not pattern:
-            self.regex_status.setText(tr("text_pattern_prompt"))
-            self.match_count.setText(tr("text_matches_label"))
-            return
-
         flags = 0
         if self.flag_ignorecase.isChecked():
             flags |= re.IGNORECASE
@@ -339,10 +352,16 @@ class TextToolsPage(PageWidget):
         if self.flag_dotall.isChecked():
             flags |= re.DOTALL
 
-        try:
-            compiled = re.compile(pattern, flags)
-        except re.error as e:
-            self.regex_status.setText(f"Invalid regex: {e}")
+        status, output, count, _positions = self.processor.run_regex(
+            pattern, test_text, flags)
+
+        if not pattern:
+            self.regex_status.setText(tr("text_pattern_prompt"))
+            self.match_count.setText(tr("text_matches_label"))
+            return
+
+        if status.startswith("Invalid regex"):
+            self.regex_status.setText(status)
             self.match_count.setText(tr("text_matches_label"))
             return
 
@@ -351,46 +370,33 @@ class TextToolsPage(PageWidget):
             self.match_count.setText(tr("text_matches_label"))
             return
 
-        matches = list(compiled.finditer(test_text))
-        match_count = len(matches)
-        self.match_count.setText(f"Matches: {match_count}")
+        self.match_count.setText(f"Matches: {count}")
 
-        if match_count == 0:
+        if count == 0:
             self.regex_status.setText(tr("text_no_matches"))
             self.regex_output.setPlainText(tr("text_no_matches"))
             return
 
-        self.regex_status.setText(f"Found {match_count} match(es)")
+        self.regex_status.setText(status)
         self.regex_status.setProperty("status_color", "ok")
         self.regex_status.style().unpolish(self.regex_status)
         self.regex_status.style().polish(self.regex_status)
 
-        lines = []
-        for idx, m in enumerate(matches, 1):
-            start, end = m.start(), m.end()
-            matched_text = m.group(0)
-            lines.append(f"Match #{idx}  [pos {start}\u2013{end}]: {matched_text!r}")
-            if m.lastindex and m.lastindex > 0:
-                if m.groupdict():
-                    for name, val in m.groupdict().items():
-                        if val is not None:
-                            lines.append(f"  [{name}] = {val!r}")
-                for g in range(1, m.lastindex + 1):
-                    gname = compiled.groupindex.get(g, None)
-                    if gname:
-                        lines.append(f"  [{gname}] = {m.group(g)!r}")
-                    else:
-                        lines.append(f"  group {g}: {m.group(g)!r}")
-            lines.append("")
+        self.regex_output.setPlainText(output)
 
-        self.regex_output.setPlainText("\n".join(lines))
-
+        # Highlight matches in the input
+        # (positions are available from processor but we re-compute for highlighting)
         extra_selections = []
-        for m in matches:
-            sel = QTextEdit.ExtraSelection()
-            sel.cursor = self.regex_input.textCursor()
-            sel.cursor.setPosition(m.start())
-            sel.cursor.setPosition(m.end(), QTextCursor.KeepAnchor)
-            sel.format.setBackground(QColor(80, 130, 220, 60))
-            extra_selections.append(sel)
+        import re as _re
+        try:
+            compiled = _re.compile(pattern, flags)
+            for m in compiled.finditer(test_text):
+                sel = QTextEdit.ExtraSelection()
+                sel.cursor = self.regex_input.textCursor()
+                sel.cursor.setPosition(m.start())
+                sel.cursor.setPosition(m.end(), QTextCursor.KeepAnchor)
+                sel.format.setBackground(QColor(80, 130, 220, 60))
+                extra_selections.append(sel)
+        except _re.error:
+            pass
         self.regex_input.setExtraSelections(extra_selections)
