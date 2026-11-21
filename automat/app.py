@@ -13,7 +13,7 @@ from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 
-from automat.config import APP_NAME, APP_VERSION, SETTINGS_FILE, DATA_DIR, RED
+from automat.config import APP_VERSION, SETTINGS_FILE, DATA_DIR, RED
 from automat.i18n import I18n
 from automat.ui.widgets import SidebarButton
 from automat.ui.icons import get as icon_get
@@ -22,6 +22,7 @@ from automat.core.theme_manager import ThemeManager
 from automat.core.calc_manager import CalcManager
 from automat.core.clock_manager import ClockManager
 from automat.core import json_io
+from automat.core import updater
 
 from automat.ui.pages.dash import DashPage
 from automat.ui.pages.convert_pro import ConvertProPage
@@ -80,6 +81,15 @@ _PAGE_KEY_BY_INDEX = [p[2] for p in PAGES if p[2] is not None]
 BOOKMARKS_FILE = str(Path(os.getenv("APPDATA", Path.home())) / "Automat" / "bookmarks.json")
 
 
+def _version_tuple(v: str):
+    """'1.0.10' -> (1, 0, 10) so updates compare numerically, not lexically."""
+    parts = []
+    for chunk in str(v).lstrip("v").split("."):
+        digits = "".join(c for c in chunk if c.isdigit())
+        parts.append(int(digits) if digits else 0)
+    return tuple(parts)
+
+
 class AutomatApp(QMainWindow):
     """Top-level window — thin orchestrator delegating to managers."""
 
@@ -128,6 +138,12 @@ class AutomatApp(QMainWindow):
 
         self.show_page("dash")
         self._refresh_ui_text()
+
+        # Отложенные стартовые задачи: онбординг для новых + тихая
+        # проверка обновлений. Через singleShot, чтобы не блокировать
+        # появление окна и не мешать headless-тестам (без event loop
+        # таймер просто не сработает).
+        QTimer.singleShot(2500, self._startup_tasks)
 
     # ------------------------------------------------------------------
     # Settings persistence
@@ -643,7 +659,6 @@ class AutomatApp(QMainWindow):
         lst = QListWidget()
         lay.addWidget(lst)
         names = [(k, tr(n)) for _, n, k, _ in PAGES if k]
-        items = dict(names)
 
         def refresh():
             q = search.text().strip().lower()
@@ -731,7 +746,11 @@ class AutomatApp(QMainWindow):
         if not urls:
             return
         paths = [u.toLocalFile() for u in urls]
-        exts = {Path(p).suffix.lower() for p in paths}
+        paths = [p for p in paths if p and os.path.exists(p)]
+        if not paths:
+            return
+        exts = {Path(p).suffix.lower() for p in paths if os.path.isfile(p)}
+        has_dir = any(os.path.isdir(p) for p in paths)
         tr = self.i18n.tr
         n = len(paths)
 
@@ -740,20 +759,23 @@ class AutomatApp(QMainWindow):
         office_exts = {".xlsx", ".xls", ".docx", ".doc", ".csv"}
         text_exts = {".txt", ".md", ".json", ".xml", ".yaml", ".yml"}
 
-        if exts & pdf_exts:
-            self.show_page("convert")
+        if exts & text_exts and not (exts & (pdf_exts | img_exts | office_exts)):
+            target = "text"
+        elif has_dir and not exts & (pdf_exts | img_exts | office_exts | text_exts):
+            target = "fileops"
+        else:
+            target = "convert"
+
+        self.show_page(target)
+        page = self._pages.get(target)
+        if page is not None and hasattr(page, "accept_dropped_paths"):
+            page.accept_dropped_paths(paths)
+
+        if target == "convert":
             self.toast(tr("drag_converted", n=n))
-        elif exts & img_exts:
-            self.show_page("convert")
-            self.toast(tr("drag_images", n=n))
-        elif exts & office_exts:
-            self.show_page("convert")
-            self.toast(tr("drag_office", n=n))
-        elif exts & text_exts:
-            self.show_page("text")
+        elif target == "text":
             self.toast(tr("drag_text", n=n))
         else:
-            self.show_page("fileops")
             self.toast(tr("drag_files", n=n))
 
     # ------------------------------------------------------------------
@@ -780,12 +802,6 @@ class AutomatApp(QMainWindow):
     def _show_bookmarks_menu(self):
         tr = self.i18n.tr
         menu = QMenu(self)
-        menu.setStyleSheet(
-            "QMenu { background-color: #2c2f34; color: #e8eaed; border: 1px solid #454a52; "
-            "border-radius: 3px; padding: 4px; }"
-            "QMenu::item { padding: 6px 20px; border-radius: 3px; }"
-            "QMenu::item:selected { background-color: #35383e; }"
-        )
 
         if not self._bookmarks:
             action = menu.addAction(tr("bookmark_empty"))
@@ -868,46 +884,185 @@ class AutomatApp(QMainWindow):
                 QMessageBox.warning(self, tr("settings_import_error"), str(e))
 
     # ------------------------------------------------------------------
-    # Auto-update check
+    # Auto-update check (поток как в Telegram: проверка -> changelog ->
+    # скачивание -> установка)
     # ------------------------------------------------------------------
 
-    def _check_updates(self):
+    def _check_updates(self, silent: bool = False):
+        """Проверить релизы GitHub в фоне.
+
+        silent=True — тихий режим для автопроверки при старте: тост
+        только если обновление реально есть, ошибок не показываем.
+        """
         from automat.core.worker import run_in_background
+        from automat.config import load_proxy
         tr = self.i18n
-        self.toast(tr("auto_update_checking"))
+        if not silent:
+            self.toast(tr("auto_update_checking"))
 
         def _fetch():
-            try:
-                import requests
-                r = requests.get(
-                    "https://api.github.com/repos/TheOpenDevTeam/automat/releases/latest",
-                    timeout=10)
-                if r.status_code == 200:
-                    data = r.json()
-                    tag = data.get("tag_name", "")
-                    html_url = data.get("html_url", "")
-                    return {"ok": True, "version": tag, "url": html_url}
-            except Exception:
-                pass
-            return {"ok": False}
+            return updater.fetch_latest(proxies=load_proxy(self.settings_data))
 
         def _on_result(data):
-            if data.get("ok") and data.get("version"):
-                latest = data["version"].lstrip("v")
-                current = APP_VERSION
-                if latest != current:
-                    reply = QMessageBox.information(
-                        self, tr("auto_update_title"),
-                        f"{tr('auto_update_available', version=latest)}\n\n"
-                        f"{tr('auto_update_current', version=current)}",
-                        QMessageBox.Open | QMessageBox.Ok,
-                        QMessageBox.Ok)
-                    if reply == QMessageBox.Open:
-                        import webbrowser
-                        webbrowser.open(data["url"])
+            updater.mark_checked(self.settings_data)
+            try:
+                self._save_settings()
+            except Exception:
+                pass
+            if not data.get("ok"):
+                if not silent:
+                    self.toast(tr("auto_update_error"), RED)
+                return
+            latest = data.get("version", "")
+            if updater.is_skipped(self.settings_data, latest):
+                return
+            if updater.is_newer(latest, APP_VERSION):
+                if silent:
+                    self.toast(tr("auto_update_found_silent", version=latest))
                 else:
-                    self.toast(tr("auto_update_uptodate"))
+                    self._show_update_dialog(data)
             else:
-                self.toast(tr("auto_update_error"), RED)
+                if not silent:
+                    self.toast(tr("auto_update_uptodate"))
 
         run_in_background(_fetch, on_result=_on_result)
+
+    def _show_update_dialog(self, release: dict):
+        """Диалог «доступно обновление» с changelog и действиями."""
+        tr = self.i18n
+        latest = release.get("version", "")
+        asset = updater.pick_installer_asset(release)
+        can_install = updater.is_frozen() and asset is not None
+
+        dlg = QDialog(self)
+        dlg.setWindowTitle(tr("auto_update_title"))
+        dlg.setMinimumWidth(480)
+        lay = QVBoxLayout(dlg)
+
+        title = QLabel(tr("auto_update_available", version=latest))
+        title.setObjectName("page_header_title")
+        lay.addWidget(title)
+        lay.addWidget(QLabel(tr("auto_update_current", version=APP_VERSION)))
+
+        notes = (release.get("notes") or "").strip()
+        if notes:
+            lay.addWidget(QLabel(tr("auto_update_notes")))
+            view = QPlainTextEdit()
+            view.setPlainText(notes[:4000])
+            view.setReadOnly(True)
+            view.setMaximumHeight(220)
+            lay.addWidget(view)
+        if not can_install:
+            hint = QLabel(tr("auto_update_dev_mode"))
+            hint.setWordWrap(True)
+            hint.setObjectName("text_muted")
+            lay.addWidget(hint)
+
+        btn_row = QHBoxLayout()
+        btn_row.addStretch()
+        if can_install:
+            install_btn = QPushButton(tr("auto_update_install"))
+            install_btn.setObjectName("accent")
+            install_btn.clicked.connect(
+                lambda: (dlg.accept(), self._download_and_install(release, asset)))
+            btn_row.addWidget(install_btn)
+        open_btn = QPushButton(tr("auto_update_open_page"))
+        open_btn.clicked.connect(lambda: self._open_release_page(release))
+        btn_row.addWidget(open_btn)
+        skip_btn = QPushButton(tr("auto_update_skip_version"))
+        skip_btn.clicked.connect(lambda: (self._skip_version(latest), dlg.reject()))
+        btn_row.addWidget(skip_btn)
+        later_btn = QPushButton(tr("auto_update_later"))
+        later_btn.clicked.connect(dlg.reject)
+        btn_row.addWidget(later_btn)
+        lay.addLayout(btn_row)
+        dlg.exec_()
+
+    def _open_release_page(self, release: dict):
+        import webbrowser
+        try:
+            webbrowser.open(release.get("url") or updater.RELEASES_PAGE_URL)
+        except Exception:
+            pass
+
+    def _skip_version(self, version: str):
+        cfg = updater.get_update_settings(self.settings_data)
+        cfg["skipped_version"] = version
+        self.settings_data["updates"] = cfg
+        self._save_settings()
+
+    def _download_and_install(self, release: dict, asset: dict):
+        """Скачать инсталлятор в фоне с прогрессом, запустить, закрыть app."""
+        from automat.core.worker import run_in_background
+        from automat.config import load_proxy
+        from automat.util import safe
+        tr = self.i18n
+
+        progress = QProgressDialog(
+            tr("auto_update_checking"), tr("auto_update_later"),
+            0, 100, self)
+        progress.setWindowTitle(tr("auto_update_title"))
+        progress.setMinimumWidth(400)
+        progress.setValue(0)
+        progress.setAutoClose(False)
+        progress.setAutoReset(False)
+        cancelled = {"flag": False}
+        progress.canceled.connect(lambda: cancelled.__setitem__("flag", True))
+
+        dest = updater.download_dir() / asset["name"]
+
+        def _download():
+            def _cb(done, total):
+                pct = int(done / total * 100) if total else 0
+                safe(progress.setValue, min(pct, 100))
+            updater.download_asset(
+                asset["url"], dest,
+                proxies=load_proxy(self.settings_data),
+                progress_cb=_cb,
+                is_cancelled=lambda: cancelled["flag"],
+            )
+            return str(dest)
+
+        def _on_done(path):
+            progress.close()
+            if updater.launch_installer(updater.download_dir() / asset["name"]):
+                self.toast(tr("auto_update_downloaded"))
+                self.close()
+
+        def _on_error(err):
+            progress.close()
+            if "cancel" in str(err).lower() or cancelled["flag"]:
+                return
+            self.toast(f"{tr('auto_update_download_failed')}: {err}", RED)
+
+        run_in_background(_download, on_result=_on_done, on_error=_on_error)
+
+    # ------------------------------------------------------------------
+    # Стартовые задачи: онбординг + тихая автопроверка
+    # ------------------------------------------------------------------
+
+    def _startup_tasks(self):
+        try:
+            if not updater.onboarding_done(self.settings_data):
+                self._show_onboarding()
+                return  # в первый запуск не шумим проверкой обновлений
+            if updater.should_auto_check(self.settings_data):
+                self._check_updates(silent=True)
+        except Exception:
+            pass
+
+    def _show_onboarding(self, force: bool = False):
+        """Показать обучение. Пропуск (крестик/«Пропустить») тоже
+        помечает его пройденным — вернуть можно из Настроек."""
+        if not force and updater.onboarding_done(self.settings_data):
+            return
+        try:
+            from automat.ui.onboarding import OnboardingDialog
+            OnboardingDialog(self, self).exec_()
+        except Exception:
+            pass
+        updater.mark_onboarding_done(self.settings_data)
+        try:
+            self._save_settings()
+        except Exception:
+            pass
