@@ -3,7 +3,6 @@ Clipboard history — SQLite store with pinning, dedup, and search.
 Monitor is process-wide and idempotent: call ensure_monitoring(qapp) once.
 """
 
-import sqlite3
 import datetime
 import os
 import logging

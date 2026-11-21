@@ -2,7 +2,7 @@
 AUTOMAT — Модуль аналитики v1.0
 Хранит реальную статистику операций в SQLite.
 """
-import sqlite3, datetime, os, logging
+import datetime, os, logging
 from pathlib import Path
 
 from automat.core import db
