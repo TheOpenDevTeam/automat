@@ -10,10 +10,10 @@ def _app_version() -> str:
     """Single source of truth for the version: installed dist metadata,
     with a fallback for plain source checkouts."""
     try:
-        from importlib.metadata import PackageNotFoundError, version
+        from importlib.metadata import version
         return version("automat")
     except Exception:
-        return "1.0b1"
+        return "1.0.0"
 
 
 APP_VERSION = _app_version()
@@ -70,7 +70,7 @@ QPushButton#sidebar_btn:checked { background-color: #32353a; color: #ffffff; bor
 QPushButton#icon_btn { background-color: transparent; color: #b5bac2; border: 1px solid #454a52; border-radius: 3px; padding: 4px; font-size: 11pt; min-width: 30px; min-height: 30px; }
 QLabel#sidebar_section { color: #7d838d; font-family: "Segoe UI"; font-size: 8pt; font-weight: normal; letter-spacing: 0.5px; padding: 8px 12px 4px; }
 QPushButton#icon_btn:hover { background-color: #35383e; color: #ffffff; }
-QLabel { color: #e8eaed; font-family: "Segoe UI"; }
+QLabel { color: #e8eaed; background: transparent; font-family: "Segoe UI"; }
 QLabel#header_title { font-size: 12pt; font-weight: normal; color: #ffffff; letter-spacing: 1px; }
 QLabel#text_muted { color: #9aa0a8; font-size: 9pt; }
 QLabel#text_secondary { color: #b5bac2; }
@@ -85,12 +85,11 @@ QComboBox { background-color: #35383e; color: #e8eaed; border: 1px solid #454a52
 QComboBox:hover { border: 1px solid #555b64; }
 QComboBox:focus { border: 1px solid #2e7bd6; }
 QComboBox::drop-down { border: none; width: 28px; }
-QComboBox::down-arrow { image: none; }
 QComboBox QAbstractItemView { background-color: #2c2f34; color: #e8eaed; selection-background-color: #2e7bd6; selection-color: white; border: 1px solid #454a52; border-radius: 3px; }
-QCheckBox { color: #b5bac2; font-family: "Segoe UI"; spacing: 8px; font-size: 9pt; }
+QCheckBox { color: #b5bac2; background: transparent; font-family: "Segoe UI"; spacing: 8px; font-size: 9pt; }
 QCheckBox::indicator { width: 15px; height: 15px; border-radius: 2px; border: 1px solid #555b64; background-color: #1f2125; }
 QCheckBox::indicator:checked { background-color: #2e7bd6; border: 1px solid #2e7bd6; }
-QRadioButton { color: #b5bac2; font-family: "Segoe UI"; spacing: 8px; font-size: 9pt; }
+QRadioButton { color: #b5bac2; background: transparent; font-family: "Segoe UI"; spacing: 8px; font-size: 9pt; }
 QRadioButton::indicator { width: 15px; height: 15px; border-radius: 8px; border: 1px solid #555b64; background-color: #1f2125; }
 QRadioButton::indicator:checked { background-color: #2e7bd6; border: 1px solid #2e7bd6; }
 QTabWidget::pane { border: 1px solid #3a3d43; background-color: #232529; border-radius: 3px; }
@@ -129,7 +128,7 @@ QLabel#clock_label { font-family: 'Segoe UI'; font-size: 9pt; padding: 0 12px; c
 QLabel#status_text { font-family: 'Segoe UI'; font-size: 9pt; padding: 0 8px; color: #9aa0a8; }
 QLineEdit#calc_input { border-radius: 3px; padding: 2px 6px; font-family: 'Consolas'; font-size: 9pt; min-width: 180px; min-height: 20px; }
 QLabel#status_info { font-family: 'Segoe UI'; font-size: 9pt; padding: 0 8px; color: #7d838d; }
-QLabel#terminal_output { font-family: Courier New; font-size: 9pt; background-color: #1a1c1f; color: #7fd6a2; }
+QPlainTextEdit#terminal_output { font-family: Courier New; font-size: 9pt; background-color: #1a1c1f; color: #7fd6a2; }
 QLabel#page_header_title { font-size: 13pt; font-weight: normal; font-family: 'Segoe UI'; color: #ffffff; }
 QLabel#page_header_subtitle { color: #7d838d; font-size: 9pt; }
 QFrame#page_header_separator { margin: 4px 0 8px 0; }
@@ -141,6 +140,10 @@ QLabel#toast_label { color: #e8eaed; font-family: 'Segoe UI'; font-size: 9pt; ba
 QLabel#log_header { color: #9aa0a8; font-family: 'Segoe UI'; font-size: 9pt; font-weight: normal; letter-spacing: 0.5px; padding: 4px 0; }
 QPlainTextEdit#log_area { background-color: #1f2125; color: #b5bac2; border: 1px solid #3a3d43; border-radius: 3px; font-family: Consolas; font-size: 9pt; padding: 6px; }
 QLabel#stat_icon { font-size: 22pt; color: #7d838d; }
+QLabel#sys_label { color: #9aa0a8; font-size: 9pt; }
+QLabel#stat_label_mono { font-family: Consolas; font-size: 10pt; color: #b5bac2; }
+QLabel#match_count { color: #9aa0a8; font-size: 9pt; }
+QPlainTextEdit#text_editor { font-family: Consolas; font-size: 10pt; }
 QPushButton#dash_action_btn { color: white; border: 1px solid #2e7bd6; border-radius: 3px; padding: 9px 10px; font-family: 'Segoe UI'; font-size: 9pt; background-color: #2e7bd6; }
 QPushButton#dash_action_btn:hover { background-color: #2a6fc2; }
 QChart#dash_chart { background-color: #2c2f34; }
@@ -212,7 +215,7 @@ QPushButton#sidebar_btn:checked { background-color: #dde0e5; color: #111827; bor
 QPushButton#icon_btn { background-color: transparent; color: #5b6470; border: 1px solid #d0d4da; border-radius: 3px; padding: 4px; font-size: 11pt; min-width: 30px; min-height: 30px; }
 QLabel#sidebar_section { color: #7d838d; font-family: "Segoe UI"; font-size: 8pt; font-weight: normal; letter-spacing: 0.5px; padding: 8px 12px 4px; }
 QPushButton#icon_btn:hover { background-color: #eef0f3; color: #111827; }
-QLabel { color: #1f2937; font-family: "Segoe UI"; }
+QLabel { color: #1f2937; background: transparent; font-family: "Segoe UI"; }
 QLabel#header_title { font-size: 12pt; font-weight: normal; color: #111827; letter-spacing: 1px; }
 QLabel#text_muted { color: #6b7280; font-size: 9pt; }
 QLabel#text_secondary { color: #4b5563; }
@@ -227,12 +230,11 @@ QComboBox { background-color: #ffffff; color: #1f2937; border: 1px solid #d0d4da
 QComboBox:hover { border: 1px solid #b9bfc8; }
 QComboBox:focus { border: 1px solid #1f6fd6; }
 QComboBox::drop-down { border: none; width: 28px; }
-QComboBox::down-arrow { image: none; }
 QComboBox QAbstractItemView { background-color: #ffffff; color: #1f2937; selection-background-color: #1f6fd6; selection-color: white; border: 1px solid #d0d4da; border-radius: 3px; }
-QCheckBox { color: #4b5563; font-family: "Segoe UI"; spacing: 8px; font-size: 9pt; }
+QCheckBox { color: #4b5563; background: transparent; font-family: "Segoe UI"; spacing: 8px; font-size: 9pt; }
 QCheckBox::indicator { width: 15px; height: 15px; border-radius: 2px; border: 1px solid #b9bfc8; background-color: #ffffff; }
 QCheckBox::indicator:checked { background-color: #1f6fd6; border: 1px solid #1f6fd6; }
-QRadioButton { color: #4b5563; font-family: "Segoe UI"; spacing: 8px; font-size: 9pt; }
+QRadioButton { color: #4b5563; background: transparent; font-family: "Segoe UI"; spacing: 8px; font-size: 9pt; }
 QRadioButton::indicator { width: 15px; height: 15px; border-radius: 8px; border: 1px solid #b9bfc8; background-color: #ffffff; }
 QRadioButton::indicator:checked { background-color: #1f6fd6; border: 1px solid #1f6fd6; }
 QTabWidget::pane { border: 1px solid #dde0e5; background-color: #ffffff; border-radius: 3px; }
@@ -271,7 +273,7 @@ QLabel#clock_label { font-family: 'Segoe UI'; font-size: 9pt; padding: 0 12px; c
 QLabel#status_text { font-family: 'Segoe UI'; font-size: 9pt; padding: 0 8px; color: #5b6470; }
 QLineEdit#calc_input { border-radius: 3px; padding: 2px 6px; font-family: 'Consolas'; font-size: 9pt; min-width: 180px; min-height: 20px; }
 QLabel#status_info { font-family: 'Segoe UI'; font-size: 9pt; padding: 0 8px; color: #6b7280; }
-QLabel#terminal_output { font-family: Courier New; font-size: 9pt; background-color: #fbfcfd; color: #1e7a4c; }
+QPlainTextEdit#terminal_output { font-family: Courier New; font-size: 9pt; background-color: #fbfcfd; color: #1e7a4c; }
 QLabel#page_header_title { font-size: 13pt; font-weight: normal; font-family: 'Segoe UI'; color: #111827; }
 QLabel#page_header_subtitle { color: #6b7280; font-size: 9pt; }
 QFrame#page_header_separator { margin: 4px 0 8px 0; }
@@ -283,7 +285,11 @@ QLabel#toast_label { color: #1f2937; font-family: 'Segoe UI'; font-size: 9pt; ba
 QLabel#log_header { color: #4b5563; font-family: 'Segoe UI'; font-size: 9pt; font-weight: normal; letter-spacing: 0.5px; padding: 4px 0; }
 QPlainTextEdit#log_area { background-color: #fbfcfd; color: #4b5563; border: 1px solid #dde0e5; border-radius: 3px; font-family: Consolas; font-size: 9pt; padding: 6px; }
 QLabel#stat_icon { font-size: 22pt; color: #9aa0a8; }
-QPushButton#dash_action_btn { color: white; border: 1px solid #1f6fd6; border-radius: 3px; padding: 9px 10px; font-family: 'Segoe UI'; font-size: 9pt; background-color: #1f6fd6; }
+QLabel#sys_label { color: #5b6470; font-size: 9pt; }
+QLabel#stat_label_mono { font-family: Consolas; font-size: 10pt; color: #4b5563; }
+QLabel#match_count { color: #6b7280; font-size: 9pt; }
+QPlainTextEdit#text_editor { font-family: Consolas; font-size: 10pt; }
+QPushButton#dash_action_btn { color: #1f2937; border: 1px solid #1f6fd6; border-radius: 3px; padding: 9px 10px; font-family: 'Segoe UI'; font-size: 9pt; background-color: #1f6fd6; }
 QPushButton#dash_action_btn:hover { background-color: #1b63c0; }
 QChart#dash_chart { background-color: #ffffff; }
 QLabel#sys_value { color: #1f2937; font-family: 'Segoe UI'; font-size: 9pt; font-weight: normal; }
