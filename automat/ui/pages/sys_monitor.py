@@ -3,16 +3,21 @@ System Monitor page — real-time CPU, RAM, disk, and network graphs
 using psutil and PyQtChart.
 """
 
-import datetime
 import os
 import platform
 
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
-from PyQt5.QtChart import QChart, QChartView, QLineSeries, QValueAxis, QDateTimeAxis
 
-from automat.config import ACCENT, ACCENT2, GREEN
+try:
+    from PyQt5.QtChart import QChart, QChartView, QLineSeries, QValueAxis, QDateTimeAxis
+    HAS_QTCHART = True
+except ImportError:
+    # Same fallback as the dashboard: show live numbers without charts.
+    HAS_QTCHART = False
+
+from automat.config import ACCENT, ACCENT2
 from automat.ui.page_base import PageWidget
 
 try:
@@ -115,6 +120,25 @@ class SysMonitorPage(PageWidget):
         chart_title.setObjectName("card_title")
         chart_layout.addWidget(chart_title)
 
+        if HAS_QTCHART:
+            self._build_chart(chart_layout)
+        else:
+            hint = QLabel(self.app.i18n.tr("dash_chart_missing"))
+            hint.setObjectName("text_muted")
+            hint.setAlignment(Qt.AlignCenter)
+            chart_layout.addWidget(hint, 1)
+            self.chart = None
+
+        stats_grid.addWidget(chart_card, 1, 0, 1, 3)
+
+        # Stretch: stat cards get 1 part, chart gets 3 parts
+        stats_grid.setRowStretch(0, 1)
+        stats_grid.setRowStretch(1, 3)
+        stats_grid.setColumnStretch(0, 1)
+        stats_grid.setColumnStretch(1, 1)
+        stats_grid.setColumnStretch(2, 1)
+
+    def _build_chart(self, chart_layout):
         self.chart = QChart()
         self.chart.setObjectName("sysmon_chart")
         self.chart.legend().setAlignment(Qt.AlignBottom)
@@ -157,15 +181,6 @@ class SysMonitorPage(PageWidget):
         chart_layout.addWidget(self.chart_view, 1)
         self.refresh_theme()
 
-        stats_grid.addWidget(chart_card, 1, 0, 1, 3)
-
-        # Stretch: stat cards get 1 part, chart gets 3 parts
-        stats_grid.setRowStretch(0, 1)
-        stats_grid.setRowStretch(1, 3)
-        stats_grid.setColumnStretch(0, 1)
-        stats_grid.setColumnStretch(1, 1)
-        stats_grid.setColumnStretch(2, 1)
-
     def _is_dark(self):
         try:
             return self.app.theme_mgr.is_dark
@@ -173,6 +188,9 @@ class SysMonitorPage(PageWidget):
             return True
 
     def refresh_theme(self):
+        super().refresh_theme()
+        if getattr(self, "chart", None) is None:
+            return
         try:
             dark = self._is_dark()
             self.chart.setTheme(QChart.ChartThemeDark if dark else QChart.ChartThemeLight)
@@ -215,6 +233,8 @@ class SysMonitorPage(PageWidget):
         self.disk_detail_lbl.setText(f"{disk_used_gb:.1f} GB / {disk_total_gb:.1f} GB")
 
         # --- Update time-series chart ---
+        if getattr(self, "chart", None) is None:
+            return
         now = QDateTime.currentDateTime().toMSecsSinceEpoch()
         self.cpu_series.append(now, cpu)
         self.ram_series.append(now, ram.percent)

@@ -6,8 +6,8 @@ Fixed: tasks survive app restart (rescheduled on load).
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
-import threading, subprocess, datetime, sys
-from automat.config import ACCENT, GREEN, RED, TASKS_FILE
+import subprocess, datetime, sys
+from automat.config import TASKS_FILE
 from automat.ui.page_base import PageWidget
 from automat.ui.widgets import LogPanel
 from automat.core.activity_log import log, EVENT_SCHEDULE, STATUS_OK, STATUS_ERROR
@@ -48,7 +48,7 @@ class CronSchedulerPage(PageWidget):
         outer.addWidget(left)
         ll.addWidget(QLabel(tr("cron_name_label")))
         self.task_name = QLineEdit()
-        self.task_name.setPlaceholderText("Task name")
+        self.task_name.setPlaceholderText(tr("cron_task_name_ph"))
         ll.addWidget(self.task_name)
         ll.addWidget(QLabel(tr("cron_type_label")))
         self.task_type = QComboBox()
@@ -56,7 +56,7 @@ class CronSchedulerPage(PageWidget):
         ll.addWidget(self.task_type)
         ll.addWidget(QLabel(tr("cron_path_label")))
         self.task_path = QLineEdit()
-        self.task_path.setPlaceholderText("Script path or URL")
+        self.task_path.setPlaceholderText(tr("cron_task_path_ph"))
         ll.addWidget(self.task_path)
         pick_btn = QPushButton(tr("cron_file_btn"))
         pick_btn.clicked.connect(lambda: self.task_path.setText(
@@ -143,7 +143,22 @@ class CronSchedulerPage(PageWidget):
         elif trigger_type == "interval":
             trigger = IntervalTrigger(minutes=task.get("interval", 60))
         elif trigger_type == "once":
-            trigger = DateTrigger(run_date=datetime.datetime.now() + datetime.timedelta(seconds=5))
+            # Persisted one-shot tasks must not fire again on every restart:
+            # after they run once they are marked done and skipped.
+            if task.get("once_done"):
+                return
+            run_at = task.get("run_at")
+            if run_at:
+                run_date = datetime.datetime.fromisoformat(run_at)
+                if run_date <= datetime.datetime.now():
+                    task["once_done"] = True
+                    self._save()
+                    return
+            else:
+                run_date = datetime.datetime.now() + datetime.timedelta(seconds=5)
+                task["run_at"] = run_date.isoformat()
+                self._save()
+            trigger = DateTrigger(run_date=run_date)
         else:
             return
 
@@ -153,12 +168,12 @@ class CronSchedulerPage(PageWidget):
                 id=job_id, name=task["name"], replace_existing=True,
             )
         except Exception as e:
-            self.log_panel.write(f"Sched error: {e}", "err")
+            safe(self.log_panel.write, self.app.i18n.tr("cron_sched_error", err=e), "err")
 
     def _add(self):
         name = self.task_name.text().strip()
         if not name:
-            self.log_panel.write("Enter task name", "warn")
+            self.log_panel.write(self.app.i18n.tr("cron_name_required"), "warn")
             return
         task = {
             "name": name,
@@ -201,6 +216,16 @@ class CronSchedulerPage(PageWidget):
             ))
 
     def _run_task(self, task):
+        if task.get("trigger") == "once":
+            # Consume the one-shot job so a restart cannot re-run it.
+            task["once_done"] = True
+            if HAS_APS and self.scheduler:
+                try:
+                    job = self.scheduler.get_job(f"task_{task['name']}")
+                    if job:
+                        job.remove()
+                except Exception:
+                    pass
         proxies = load_proxy(self.app.settings_data) if hasattr(self, 'app') and self.app else None
         try:
             if task["type"] == "script" and task["path"]:
@@ -274,5 +299,6 @@ class CronSchedulerPage(PageWidget):
             try:
                 self._schedule_task(task)
             except Exception as e:
-                self.log_panel.write(f"schedule failed: {task.get('name')}: {e}", "err")
+                self.log_panel.write(
+                    self.app.i18n.tr("cron_load_failed", name=task.get("name"), err=e), "err")
         self._refresh()

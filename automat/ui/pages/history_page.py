@@ -4,13 +4,12 @@ from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 import os
-from automat.config import DATA_DIR
+from automat.config import DATA_DIR, GREEN
 from automat.ui.page_base import PageWidget
 from automat.core.activity_log import (
-    get_all_events_paginated, get_event_stats_by_type,
+    get_all_events_paginated,
     export_csv, export_json, clear_all_events,
-    get_totals, EVENT_CONVERT, EVENT_SEND, EVENT_HASH,
-    EVENT_SCHEDULE, EVENT_FILEOP, EVENT_CLEAN, EVENT_DATAGEN, EVENT_TEXT,
+    get_totals,
 )
 from automat.core.worker import run_in_background
 

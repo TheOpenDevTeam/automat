@@ -4,7 +4,6 @@ pretty-printing, minification, and JSONPath queries.
 """
 
 import json
-import re
 
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
@@ -98,7 +97,7 @@ class ApiToolsPage(PageWidget):
 
     def _send_request(self):
         if not HAS_REQUESTS:
-            QMessageBox.warning(self, "Error", self.app.i18n.tr("api_no_requests"))
+            QMessageBox.warning(self, self.app.i18n.tr("common_error"), self.app.i18n.tr("api_no_requests"))
             return
         method = self.method.currentText().lower()
         url = self.url.text()

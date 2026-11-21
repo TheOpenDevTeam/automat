@@ -6,7 +6,6 @@ Fixed: thread-safety for QMessageBox, uses Worker pattern.
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
-from automat.config import GREEN
 from automat.ui.page_base import PageWidget
 from automat.ui.widgets import LogPanel
 from automat.core.worker import run_in_background
@@ -38,7 +37,7 @@ class SSHClientPage(PageWidget):
         outer.addWidget(left)
         ll.addWidget(QLabel(tr("ssh_host")))
         self.host = QLineEdit("localhost")
-        self.host.setPlaceholderText("Hostname or IP")
+        self.host.setPlaceholderText(tr("ssh_host_ph"))
         ll.addWidget(self.host)
         ll.addWidget(QLabel(tr("ssh_port")))
         self.port = QSpinBox()
@@ -47,11 +46,11 @@ class SSHClientPage(PageWidget):
         ll.addWidget(self.port)
         ll.addWidget(QLabel(tr("ssh_user")))
         self.user = QLineEdit("root")
-        self.user.setPlaceholderText("Username")
+        self.user.setPlaceholderText(tr("ssh_user_ph"))
         ll.addWidget(self.user)
         ll.addWidget(QLabel(tr("ssh_password")))
         self.password = QLineEdit()
-        self.password.setPlaceholderText("Password (optional)")
+        self.password.setPlaceholderText(tr("ssh_pass_ph"))
         self.password.setEchoMode(QLineEdit.Password)
         ll.addWidget(self.password)
         self.key_file = QLineEdit()
@@ -64,7 +63,7 @@ class SSHClientPage(PageWidget):
         ll.addWidget(key_btn)
         self.connect_btn = QPushButton(tr("ssh_connect"))
         self.connect_btn.setObjectName("accent")
-        self.connect_btn.setToolTip("Connect to SSH server")
+        self.connect_btn.setToolTip(tr("ssh_connect_tip"))
         self.connect_btn.clicked.connect(self._toggle_connect)
         ll.addWidget(self.connect_btn)
         self.conn_status = QLabel(tr("ssh_not_connected"))

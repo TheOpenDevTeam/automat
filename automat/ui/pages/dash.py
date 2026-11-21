@@ -11,8 +11,6 @@ import platform
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
-from PyQt5.QtChart import QChart, QChartView, QBarSeries, QBarSet, QBarCategoryAxis, QValueAxis
-
 from automat.config import ACCENT, ACCENT2, GREEN, YELLOW, RED
 from automat.ui.page_base import PageWidget
 from automat.ui.widgets import SkeletonBlock
@@ -25,6 +23,16 @@ from automat.core.activity_log import (
     get_success_rate,
 )
 from automat.core.worker import run_in_background
+
+try:
+    from PyQt5.QtChart import (
+        QChart, QChartView, QBarSeries, QBarSet, QBarCategoryAxis, QValueAxis,
+    )
+    HAS_QTCHART = True
+except ImportError:
+    # PyQtChart is an optional runtime dependency: the dashboard must still
+    # open without it, just without the activity chart.
+    HAS_QTCHART = False
 
 try:
     import psutil as _psutil
@@ -128,13 +136,23 @@ class DashPage(PageWidget):
         # Row 2, col 0-1: activity chart
         card4, _inner4, layout4 = self.card(f"  {tr('dash_chart')}")
         grid.addWidget(card4, 2, 0, 1, 2)
-        self.chart_view = QChartView()
-        self.chart_view.setRenderHint(QPainter.RenderHint.Antialiasing)
-        self.chart = QChart()
-        self.chart.setObjectName("dash_chart")
-        self.chart_view.setChart(self.chart)
-        self.chart.setBackgroundRoundness(6)
-        layout4.addWidget(self.chart_view)
+        self.chart = None
+        self.chart_view = None
+        if HAS_QTCHART:
+            chart_view = QChartView()
+            chart_view.setRenderHint(QPainter.RenderHint.Antialiasing)
+            chart = QChart()
+            chart.setObjectName("dash_chart")
+            chart_view.setChart(chart)
+            chart.setBackgroundRoundness(6)
+            layout4.addWidget(chart_view)
+            self.chart_view = chart_view
+            self.chart = chart
+        else:
+            hint = QLabel(tr("dash_chart_missing"))
+            hint.setObjectName("text_muted")
+            hint.setAlignment(Qt.AlignCenter)
+            layout4.addWidget(hint)
         self.refresh_theme()
 
         # Row 2, col 2-3: system info
@@ -208,27 +226,28 @@ class DashPage(PageWidget):
                 detail = ev["detail"][:40] or ev["event"]
                 self.feed.addItem(f"{ico} {detail}  [{ts}]")
 
-        self.chart.removeAllSeries()
-        if chart:
-            bar_set = QBarSet("Activity")
-            bar_set.setColor(QColor(ACCENT))
-            categories = []
-            for entry in chart:
-                bar_set.append(entry["total"])
-                categories.append(entry["date"][5:])
-            series = QBarSeries()
-            series.append(bar_set)
-            self.chart.addSeries(series)
+        if self.chart is not None:
+            self.chart.removeAllSeries()
+            if chart:
+                bar_set = QBarSet("Activity")
+                bar_set.setColor(QColor(ACCENT))
+                categories = []
+                for entry in chart:
+                    bar_set.append(entry["total"])
+                    categories.append(entry["date"][5:])
+                series = QBarSeries()
+                series.append(bar_set)
+                self.chart.addSeries(series)
 
-            axis_x = QBarCategoryAxis()
-            axis_x.append(categories)
-            self.chart.addAxis(axis_x, Qt.AlignBottom)
-            series.attachAxis(axis_x)
+                axis_x = QBarCategoryAxis()
+                axis_x.append(categories)
+                self.chart.addAxis(axis_x, Qt.AlignBottom)
+                series.attachAxis(axis_x)
 
-            axis_y = QValueAxis()
-            self.chart.addAxis(axis_y, Qt.AlignLeft)
-            series.attachAxis(axis_y)
-            self._style_axes(axis_x, axis_y)
+                axis_y = QValueAxis()
+                self.chart.addAxis(axis_y, Qt.AlignLeft)
+                series.attachAxis(axis_y)
+                self._style_axes(axis_x, axis_y)
 
         self._clear_grid(self.sys_grid)
 
@@ -276,6 +295,8 @@ class DashPage(PageWidget):
             self.sys_grid.addWidget(kl, i, 0)
             vl = QLabel(value)
             vl.setObjectName("sys_value")
+            if color:
+                vl.setStyleSheet(f"color: {color};")
             self.sys_grid.addWidget(vl, i, 1)
 
     def _is_dark(self):
@@ -285,6 +306,9 @@ class DashPage(PageWidget):
             return True
 
     def refresh_theme(self):
+        super().refresh_theme()
+        if self.chart is None:
+            return
         try:
             dark = self._is_dark()
             self.chart.setTheme(QChart.ChartThemeDark if dark else QChart.ChartThemeLight)

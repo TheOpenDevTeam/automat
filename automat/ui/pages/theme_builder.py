@@ -6,7 +6,6 @@ from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 from automat.config import DATA_DIR
 from automat.ui.page_base import PageWidget
-from automat.core.worker import run_in_background
 from automat.core import json_io
 
 THEMES_DIR = DATA_DIR / "themes"
@@ -64,6 +63,12 @@ def _hex_to_rgb(h):
     return tuple(int(h[i:i+2], 16) for i in (0, 2, 4))
 
 
+def _is_dark_color(hex_color):
+    """True when the colour is dark enough to need light text/icons."""
+    r, g, b = _hex_to_rgb(hex_color)
+    return (r * 0.299 + g * 0.587 + b * 0.114) < 128
+
+
 class ColorButton(QPushButton):
     colorChanged = pyqtSignal(str)
 
@@ -116,7 +121,7 @@ class ThemeBuilderPage(PageWidget):
 
         name_card, _, name_layout = self.card(tr("theme_name"))
         self.name_input = QLineEdit()
-        self.name_input.setPlaceholderText("My Theme")
+        self.name_input.setPlaceholderText(tr("theme_name_ph"))
         name_layout.addWidget(self.name_input)
         left_col.addWidget(name_card)
 
@@ -187,8 +192,6 @@ class ThemeBuilderPage(PageWidget):
 
     def _update_preview(self):
         bg = self.bg_btn.color()
-        surface = self.surface_btn.color()
-        accent = self.accent_btn.color()
         text = self.text_btn.color()
 
         self.preview.setStyleSheet(
@@ -227,7 +230,11 @@ class ThemeBuilderPage(PageWidget):
         text = self.text_btn.color()
 
         qss = _build_qss(bg, surface, accent, text)
-        self.app.theme_mgr.apply_custom(qss)
+        dark = _is_dark_color(bg)
+        self.app.theme_mgr.apply_custom(qss, dark=dark, arrow_color=text)
+        # Recolour sidebar/header/page icons and charts for the new palette.
+        self.app.apply_theme()
+        self.app._save_settings()
         if hasattr(self.app, 'toast'):
             self.app.toast(tr("theme_applied"))
 

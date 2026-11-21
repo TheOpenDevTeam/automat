@@ -31,7 +31,7 @@ class TelegramPage(PageWidget):
 
         left, inner_left, ll = self.card(tr("telegram_settings_card"))
         outer.addWidget(left)
-        ll.addWidget(QLabel("Bot Token:"))
+        ll.addWidget(QLabel(tr("telegram_token_label")))
         self.token = ValidatedLineEdit(
             validator=lambda t: len(t) > 10 and ":" in t,
             placeholder="1234567890:ABCdef..."
@@ -143,7 +143,6 @@ class TelegramPage(PageWidget):
         import time as _time
         total, sent, failed = len(ids), 0, 0
         start = _time.time()
-        tr = self.app.i18n.tr
         self.results = []
 
         for i, chat_id in enumerate(ids):

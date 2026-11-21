@@ -4,7 +4,7 @@ from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 from automat.ui.page_base import PageWidget
-from automat.core.activity_log import search_events, get_recent_events
+from automat.core.activity_log import search_events
 
 
 class SearchPage(PageWidget):

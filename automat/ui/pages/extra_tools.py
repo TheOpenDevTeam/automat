@@ -240,7 +240,6 @@ class ExtraToolsPage(PageWidget):
         return w
 
     def _toggle_pick(self, on):
-        tr = self.tr
         self._picking = on
         if on:
             QApplication.setOverrideCursor(Qt.CrossCursor)

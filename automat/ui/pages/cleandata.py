@@ -7,7 +7,6 @@ from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 import csv, json, re
-from automat.config import ACCENT, GREEN, RED
 from automat.ui.page_base import PageWidget
 from automat.ui.widgets import LogPanel, ProgressBar
 from automat.core.activity_log import log, EVENT_CLEAN, STATUS_OK

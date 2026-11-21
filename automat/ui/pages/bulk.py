@@ -77,11 +77,12 @@ class BulkSendPage(PageWidget):
         self.content_layout.addWidget(self.log_panel)
 
     def _load_data(self):
-        fp, _ = QFileDialog.getOpenFileName(self, "JSON/CSV", "", "JSON (*.json);;CSV (*.csv)")
+        fp, _ = QFileDialog.getOpenFileName(
+            self, self.app.i18n.tr("bulk_load_title"), "", "JSON (*.json);;CSV (*.csv)")
         if fp:
             with open(fp, encoding="utf-8", errors="ignore") as f:
                 self.data_text.setPlainText(f.read())
-            self.log_panel.write(f"Loaded {fp}", "ok")
+            self.log_panel.write(self.app.i18n.tr("bulk_loaded", path=fp), "ok")
 
     def _start(self):
         if not requests:
@@ -105,7 +106,7 @@ class BulkSendPage(PageWidget):
         self._worker = run_in_background(
             self._run_bg, data, url, method, delay, proxies,
             on_result=self._on_done,
-            on_error=lambda e: self.log_panel.write(f"Error: {e}", "err"),
+            on_error=lambda e: self.log_panel.write(self.app.i18n.tr("bulk_error", err=e), "err"),
         )
 
     def _stop(self):
@@ -116,7 +117,6 @@ class BulkSendPage(PageWidget):
         total = len(data)
         sent = failed = 0
         start = time.time()
-        tr = self.app.i18n.tr
 
         for i, item in enumerate(data):
             if not self._running:
@@ -158,7 +158,7 @@ class BulkSendPage(PageWidget):
         total = result["total"]
         failed = result["failed"]
         self.log_panel.write(
-            f"Done: {sent}/{total}",
+            self.app.i18n.tr("bulk_done", sent=sent, total=total),
             "ok" if failed == 0 else "warn")
         log(EVENT_SEND, STATUS_OK, f"{result['method'].upper()} {result['url']}", sent)
         if failed:

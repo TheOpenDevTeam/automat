@@ -167,7 +167,7 @@ class SnippetsPage(PageWidget):
         rl.addWidget(QLabel(tr("snippet_name_label")))
         name_row = QHBoxLayout()
         self.snip_name = QLineEdit()
-        self.snip_name.setPlaceholderText("Snippet name")
+        self.snip_name.setPlaceholderText(tr("snippet_name_ph"))
         name_row.addWidget(self.snip_name, 1)
         self.snip_tags = QLineEdit()
         self.snip_tags.setPlaceholderText(tr("snippet_tags_hint"))
@@ -177,7 +177,7 @@ class SnippetsPage(PageWidget):
 
         rl.addWidget(QLabel(tr("snippet_code_label")))
         self.snip_code = QPlainTextEdit()
-        self.snip_code.setPlaceholderText("Paste code here... Use {{var}} for templates.")
+        self.snip_code.setPlaceholderText(tr("snippet_code_ph"))
         self.snip_code.setObjectName("code_editor")
         rl.addWidget(self.snip_code, 1)
 

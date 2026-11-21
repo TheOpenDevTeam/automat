@@ -7,7 +7,6 @@ from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 import subprocess, os
-from automat.config import GREEN
 from automat.ui.page_base import PageWidget
 from automat.ui.widgets import LogPanel
 from automat.core.worker import run_in_background
@@ -32,13 +31,13 @@ class GitToolsPage(PageWidget):
         ll.addWidget(QLabel(tr("git_repo_path")))
         repo_row = QHBoxLayout()
         self.repo_path = QLineEdit(os.getcwd())
-        self.repo_path.setPlaceholderText("Repository path")
+        self.repo_path.setPlaceholderText(tr("git_repo_path_ph"))
         repo_row.addWidget(self.repo_path)
         browse_btn = QPushButton("\u2026")
         browse_btn.setFixedWidth(40)
-        browse_btn.setToolTip("Select repository folder")
+        browse_btn.setToolTip(tr("git_pick_repo_tip"))
         browse_btn.clicked.connect(
-            lambda: self.repo_path.setText(QFileDialog.getExistingDirectory(self, "Repository"))
+            lambda: self.repo_path.setText(QFileDialog.getExistingDirectory(self, tr("git_repo_dialog")))
         )
         repo_row.addWidget(browse_btn)
         ll.addLayout(repo_row)
@@ -49,10 +48,10 @@ class GitToolsPage(PageWidget):
         ll.addWidget(self.clone_url)
 
         btn_grid = QGridLayout()
-        git_tips = ["Clone a remote repository", "Show working tree status",
-                     "Pull latest changes", "Push commits to remote",
-                     "Show commit log", "List/create branches",
-                     "Stage all changes", "Commit staged changes"]
+        git_tips = [tr("git_clone_tip"), tr("git_status_tip"),
+                    tr("git_pull_tip"), tr("git_push_tip"),
+                    tr("git_log_tip"), tr("git_branch_tip"),
+                    tr("git_add_all_tip"), tr("git_commit_tip")]
         btns = [
             (0, 0, tr("git_clone"), self._clone, "accent"),
             (0, 1, tr("git_status"), self._status, "accent"),
@@ -75,7 +74,7 @@ class GitToolsPage(PageWidget):
         ll.addWidget(QLabel(tr("git_commit_msg")))
         self.commit_msg = QLineEdit()
         self.commit_msg.setPlaceholderText(tr("git_commit_placeholder"))
-        self.commit_msg.setToolTip("Press Ctrl+Enter to commit")
+        self.commit_msg.setToolTip(tr("git_commit_hint"))
         ll.addWidget(self.commit_msg)
 
         right, inner_right, rl = self.card(tr("git_output_card"))

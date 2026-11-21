@@ -5,6 +5,7 @@ Fixed: undo/redo preserved for all transforms via cursor operations.
 """
 
 import re
+import os
 import collections
 
 from PyQt5.QtWidgets import *
@@ -13,6 +14,9 @@ from PyQt5.QtGui import *
 
 from automat.ui.page_base import PageWidget
 from automat.core.activity_log import log, EVENT_TEXT, STATUS_OK
+
+# Read at most this much of a dropped file so a huge log can't freeze the GUI.
+DROP_READ_LIMIT = 5 * 1024 * 1024
 
 
 class TextToolsPage(PageWidget):
@@ -87,7 +91,7 @@ class TextToolsPage(PageWidget):
         self.regex_cb = QCheckBox(tr("text_regex"))
         find_row.addWidget(self.regex_cb)
         find_btn = QPushButton("\U0001f50d")
-        find_btn.setToolTip("Find & Replace")
+        find_btn.setToolTip(tr("text_find_replace_tip"))
         find_btn.clicked.connect(self._find)
         find_row.addWidget(find_btn)
         replace_btn = QPushButton(tr("text_replace_all"))
@@ -101,7 +105,7 @@ class TextToolsPage(PageWidget):
         ll.addWidget(self.replace_text)
 
         self.editor = QPlainTextEdit()
-        self.editor.setPlaceholderText("Paste or type text here...")
+        self.editor.setPlaceholderText(tr("text_editor_ph"))
         self.editor.setObjectName("text_editor")
         self.editor.setTabStopDistance(
             QFontMetricsF(self.editor.font()).horizontalAdvance(' ') * 4
@@ -136,11 +140,11 @@ class TextToolsPage(PageWidget):
         rl.addWidget(self.word_stats)
 
         load_btn = QPushButton(tr("text_load"))
-        load_btn.setToolTip("Load text from file")
+        load_btn.setToolTip(tr("text_load"))
         load_btn.clicked.connect(self._load_file)
         rl.addWidget(load_btn)
         save_btn = QPushButton(tr("text_save"))
-        save_btn.setToolTip("Save text to file")
+        save_btn.setToolTip(tr("text_save"))
         save_btn.clicked.connect(self._save_file)
         rl.addWidget(save_btn)
 
@@ -237,11 +241,26 @@ class TextToolsPage(PageWidget):
     def _load_file(self):
         fp, _ = QFileDialog.getOpenFileName(self, self.app.i18n.tr("text_load"), "", "Text (*.txt);;All files (*.*)")
         if fp:
-            try:
-                with open(fp, encoding="utf-8", errors="ignore") as f:
-                    self.editor.setPlainText(f.read())
-            except Exception as e:
-                QMessageBox.warning(self, "Error", str(e))
+            self._load_path(fp)
+
+    def _load_path(self, fp):
+        try:
+            with open(fp, encoding="utf-8", errors="ignore") as f:
+                self._replace_content(f.read(DROP_READ_LIMIT))
+            log(EVENT_TEXT, STATUS_OK, fp, 1)
+            return True
+        except Exception as e:
+            QMessageBox.warning(self, self.app.i18n.tr("common_error"), str(e))
+            return False
+
+    def accept_dropped_paths(self, paths):
+        loaded = 0
+        for p in paths:
+            if os.path.isfile(p) and self._load_path(p):
+                loaded += 1
+                break  # the editor holds a single document
+        if loaded and hasattr(self.app, "toast"):
+            self.app.toast(f"+1")
 
     def _save_file(self):
         fp, _ = QFileDialog.getSaveFileName(self, self.app.i18n.tr("text_save"), "", "Text (*.txt);;All files (*.*)")
@@ -250,7 +269,7 @@ class TextToolsPage(PageWidget):
                 with open(fp, "w", encoding="utf-8") as f:
                     f.write(self.editor.toPlainText())
             except Exception as e:
-                QMessageBox.warning(self, "Error", str(e))
+                QMessageBox.warning(self, self.app.i18n.tr("common_error"), str(e))
 
     # ------------------------------------------------------------------
     # Regex Tester tab
