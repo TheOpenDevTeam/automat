@@ -3,8 +3,14 @@ Vector icon provider — renders embedded SVG icons to QPixmap via QSvgRenderer,
 with a QPainter-based fallback for systems without QtSvg.
 """
 
-from PyQt5.QtGui import QIcon, QPixmap, QPainter, QColor, QPen, QFont, QBrush
-from PyQt5.QtCore import Qt, QByteArray, QRectF
+import os
+import tempfile
+from pathlib import Path
+
+from PyQt5.QtGui import (
+    QIcon, QPixmap, QPainter, QColor, QPen, QFont, QBrush, QPolygonF,
+)
+from PyQt5.QtCore import Qt, QByteArray, QRectF, QPointF
 
 try:
     from PyQt5.QtSvg import QSvgRenderer
@@ -14,6 +20,7 @@ except ImportError:
 
 _COLOR = "#e2e8f0"
 _LIGHT_COLOR = "#4f6080"
+_DARK = True
 
 _SVG_BODIES = {
     "dashboard": (
@@ -167,11 +174,76 @@ def all_names():
 
 def set_theme(is_dark: bool):
     """Update the default icon color to match the current theme and clear cache."""
-    global _COLOR
-    _COLOR = "#e2e8f0" if is_dark else _LIGHT_COLOR
+    global _COLOR, _DARK
+    _DARK = bool(is_dark)
+    _COLOR = "#e2e8f0" if _DARK else _LIGHT_COLOR
     _cache.clear()
 
 
 def is_dark() -> bool:
     """Current icon theme flag (True = dark)."""
-    return _COLOR == "#e2e8f0"
+    return _DARK
+
+
+# ── combo/spin arrow images ─────────────────────────────────────────────────
+# QSS cannot draw triangles, and once a QComboBox/QSpinBox is styled the
+# native arrow is not painted either. We render tiny PNGs once per colour
+# and reference them from the stylesheet, so dropdowns keep their affordance
+# in both themes.
+
+_ARROW_DIR = Path(tempfile.gettempdir()) / "automat_ui_icons"
+_arrow_cache = {}
+
+
+def _arrow_png(direction: str, color: str) -> str:
+    """Render (and cache) a small triangle; return a QSS-safe file path."""
+    key = (direction, color)
+    if key in _arrow_cache:
+        return _arrow_cache[key]
+    try:
+        _ARROW_DIR.mkdir(parents=True, exist_ok=True)
+        path = _ARROW_DIR / f"arrow_{direction}_{color.lstrip('#')}.png"
+        if not path.exists():
+            pm = QPixmap(9, 7)
+            pm.fill(Qt.transparent)
+            p = QPainter(pm)
+            p.setRenderHint(QPainter.Antialiasing)
+            p.setPen(Qt.NoPen)
+            p.setBrush(QBrush(QColor(color)))
+            if direction == "up":
+                tri = QPolygonF([QPointF(0.5, 6.0), QPointF(8.5, 6.0), QPointF(4.5, 1.0)])
+            else:
+                tri = QPolygonF([QPointF(0.5, 1.0), QPointF(8.5, 1.0), QPointF(4.5, 6.0)])
+            p.drawPolygon(tri)
+            p.end()
+            pm.save(str(path), "PNG")
+        result = path.as_posix()
+    except Exception:
+        result = ""
+    _arrow_cache[key] = result
+    return result
+
+
+def arrow_qss(color: str) -> str:
+    """QSS rules that restore combo/spin arrows for the given colour.
+
+    Returns an empty string when no QApplication exists (QPixmap needs one),
+    which keeps ThemeManager usable in plain unit tests.
+    """
+    try:
+        from PyQt5.QtWidgets import QApplication
+        if QApplication.instance() is None:
+            return ""
+    except Exception:
+        return ""
+    down = _arrow_png("down", color)
+    up = _arrow_png("up", color)
+    if not down or not up:
+        return ""
+    return f"""
+QComboBox::drop-down {{ border: none; width: 24px; }}
+QComboBox::down-arrow {{ image: url("{down}"); width: 9px; height: 7px; }}
+QSpinBox::up-arrow, QDoubleSpinBox::up-arrow, QDateEdit::up-arrow, QTimeEdit::up-arrow, QDateTimeEdit::up-arrow {{ image: url("{up}"); width: 8px; height: 6px; }}
+QSpinBox::down-arrow, QDoubleSpinBox::down-arrow, QDateEdit::down-arrow, QTimeEdit::down-arrow, QDateTimeEdit::down-arrow {{ image: url("{down}"); width: 8px; height: 6px; }}
+"""
+
