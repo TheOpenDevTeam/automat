@@ -1,7 +1,7 @@
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
-from automat.config import ACCENT, ACCENT2, GREEN, RED, YELLOW
+from automat.config import ACCENT, GREEN, RED, YELLOW
 
 
 class Toast(QWidget):
@@ -58,9 +58,18 @@ class LogPanel(QWidget):
         layout.addWidget(self.log)
         self._dark_colors = {"ok": GREEN, "err": RED, "warn": YELLOW, "info": ACCENT}
         self._light_colors = {"ok": "#1a7f4a", "err": "#c5221f", "warn": "#9a6700", "info": "#1a5fb4"}
+        # Raw entries are kept so a theme switch can re-render them with the
+        # colours of the new theme (HTML spans are otherwise frozen).
+        self._entries = []
 
     def write(self, msg, tag="ok"):
         ts = QDateTime.currentDateTime().toString("HH:mm:ss")
+        self._entries.append((ts, msg, tag))
+        if len(self._entries) > 500:
+            self._entries = self._entries[-500:]
+        self.log.appendHtml(self._format(ts, msg, tag))
+
+    def _format(self, ts, msg, tag):
         try:
             from automat.ui.icons import is_dark
             dark = is_dark()
@@ -68,9 +77,23 @@ class LogPanel(QWidget):
             dark = True
         colors = self._dark_colors if dark else self._light_colors
         color = colors.get(tag, colors["info"])
-        self.log.appendHtml(f'<span style="color: {color};">[{ts}] {msg}</span>')
+        return f'<span style="color: {color};">[{ts}] {msg}</span>'
+
+    def _rebuild(self):
+        entries = getattr(self, "_entries", None)
+        if entries is None:
+            return
+        self.log.clear()
+        for ts, msg, tag in entries:
+            self.log.appendHtml(self._format(ts, msg, tag))
+
+    def changeEvent(self, event):
+        if event.type() == QEvent.StyleChange:
+            self._rebuild()
+        super().changeEvent(event)
 
     def clear(self):
+        self._entries.clear()
         self.log.clear()
 
 

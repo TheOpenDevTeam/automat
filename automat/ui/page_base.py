@@ -3,6 +3,8 @@ Base page widget — provides scrollable content, card layout, and header.
 All styles are handled via objectName + QSS in config.py.
 """
 
+import weakref
+
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
@@ -13,6 +15,8 @@ class PageWidget(QWidget):
     def __init__(self, app=None):
         super().__init__()
         self.app = app
+        # (weakref to QLabel, icon name, size) — re-rendered on theme change
+        self._header_icons = []
         self.main_layout = QVBoxLayout(self)
         self.main_layout.setContentsMargins(0, 0, 0, 0)
         self.scroll = QScrollArea()
@@ -35,6 +39,7 @@ class PageWidget(QWidget):
         icon_lbl.setPixmap(pm)
         icon_lbl.setFixedSize(36, 36)
         h_layout.addWidget(icon_lbl)
+        self._header_icons.append((weakref.ref(icon_lbl), icon_name, 36))
         text_layout = QVBoxLayout()
         h = QLabel(title)
         h.setObjectName("page_header_title")
@@ -80,3 +85,29 @@ class PageWidget(QWidget):
         row.addWidget(lbl)
         row.addWidget(widget, 1)
         parent_layout.addLayout(row)
+
+    def accept_dropped_paths(self, paths):
+        """Handle files/folders dropped on the main window.
+
+        Pages that can consume files override this. The base implementation
+        is a no-op, so a drop on an unsupported page is silently ignored.
+        """
+        return
+
+    def refresh_theme(self):
+        """Re-render theme-dependent decorations (page header icon).
+
+        Pages with extra theme-aware painting (charts) override this and
+        must call `super().refresh_theme()` first.
+        """
+        alive = []
+        for ref, icon_name, size in self._header_icons:
+            label = ref()
+            if label is None:
+                continue
+            try:
+                label.setPixmap(icon_pixmap(icon_name, size))
+            except RuntimeError:
+                continue
+            alive.append((ref, icon_name, size))
+        self._header_icons = alive
