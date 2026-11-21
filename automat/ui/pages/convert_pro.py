@@ -1,55 +1,18 @@
 """
-File conversion page вЂ” Excelв†”PDF, PDFв†’Word, Imagesв†’PDF, CSVв†”Excel.
-Fixed: Worker pattern, confirmation dialog, thread-safety.
+File conversion page — UI layer only.
+Business logic lives in automat.core.converter.Converter.
 """
 
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 import os
-import csv
 from automat.config import APP_NAME
 from automat.ui.page_base import PageWidget
 from automat.ui.widgets import LogPanel, ProgressBar, ValidatedLineEdit
 from automat.core.activity_log import log, EVENT_CONVERT, STATUS_OK, STATUS_ERROR
 from automat.core.worker import run_in_background
-
-try:
-    from reportlab.lib.pagesizes import A4
-    from reportlab.pdfgen import canvas
-    HAS_REPORTLAB = True
-except ImportError:
-    HAS_REPORTLAB = False
-
-try:
-    from openpyxl import load_workbook, Workbook
-    HAS_OPENPYXL = True
-except ImportError:
-    HAS_OPENPYXL = False
-
-try:
-    from pdf2docx import Converter
-    HAS_PDF2DOCX = True
-except ImportError:
-    HAS_PDF2DOCX = False
-
-try:
-    from docx2pdf import convert as w2p
-    HAS_DOCX2PDF = True
-except ImportError:
-    HAS_DOCX2PDF = False
-
-try:
-    from PIL import Image
-    HAS_PIL = True
-except ImportError:
-    HAS_PIL = False
-
-try:
-    import pdfplumber
-    HAS_PDFPLUMBER = True
-except ImportError:
-    HAS_PDFPLUMBER = False
+from automat.core.converter import Converter
 
 
 class ConvertProPage(PageWidget):
@@ -57,6 +20,7 @@ class ConvertProPage(PageWidget):
         super().__init__(app)
         self.files = []
         self.stop_flag = False
+        self.converter = Converter()
         self.build()
 
     def build(self):
@@ -162,7 +126,6 @@ class ConvertProPage(PageWidget):
         if not self.out_path.text():
             QMessageBox.warning(self, APP_NAME, self.app.i18n.tr("convert_no_out"))
             return
-        # Confirmation dialog for batch operation
         reply = QMessageBox.question(
             self, APP_NAME,
             self.app.i18n.tr("convert_confirm", n=len(self.files)),
@@ -171,6 +134,7 @@ class ConvertProPage(PageWidget):
         if reply != QMessageBox.Yes:
             return
         self.stop_flag = False
+        self.converter.stop_flag = False
         self.progress.setValue(0)
         run_in_background(
             self._run,
@@ -180,6 +144,7 @@ class ConvertProPage(PageWidget):
 
     def _stop(self):
         self.stop_flag = True
+        self.converter.stop()
         self.log_panel.write(self.app.i18n.tr("convert_stopping"), "warn")
 
     def _on_done(self, _):
@@ -190,76 +155,25 @@ class ConvertProPage(PageWidget):
         tr = self.app.i18n.tr
         out = self.out_path.text()
         conv = self.conv_type.currentText()
-        total = len(self.files)
-        for i, f in enumerate(self.files):
-            if self.stop_flag:
-                break
-            safe(self.progress.setValue, int((i + 1) / total * 100))
-            safe(self.log_panel.write, f"[{i+1}/{total}] {os.path.basename(f)}", "info")
-            try:
-                ext = os.path.splitext(f)[1].lower()
-                name = os.path.splitext(os.path.basename(f))[0]
-                dst = os.path.join(out, name)
-                if "Excel \u2192 PDF" in conv and ext in (".xlsx", ".xls"):
-                    if not HAS_OPENPYXL or not HAS_REPORTLAB:
-                        safe(self.log_panel.write, tr("convert_missing_lib", lib="reportlab openpyxl"), "err")
-                        continue
-                    wb = load_workbook(f)
-                    ws = wb.active
-                    cv = canvas.Canvas(dst + ".pdf", pagesize=A4)
-                    y = 800
-                    for row in ws.iter_rows(values_only=True):
-                        cv.drawString(40, y, "  ".join(str(cell or "") for cell in row))
-                        y -= 20
-                    cv.save()
-                elif "PDF \u2192 Word" in conv and ext == ".pdf":
-                    if not HAS_PDF2DOCX:
-                        safe(self.log_panel.write, tr("convert_missing_lib", lib="pdf2docx"), "err")
-                        continue
-                    cv = Converter(f)
-                    cv.convert(dst + ".docx")
-                    cv.close()
-                elif "Word \u2192 PDF" in conv and ext == ".docx":
-                    if not HAS_DOCX2PDF:
-                        safe(self.log_panel.write, tr("convert_missing_lib", lib="docx2pdf"), "err")
-                        continue
-                    w2p(f, dst + ".pdf")
-                elif "Images \u2192 PDF" in conv and ext in (".png", ".jpg", ".jpeg", ".bmp"):
-                    if not HAS_PIL:
-                        safe(self.log_panel.write, tr("convert_missing_lib", lib="Pillow"), "err")
-                        continue
-                    img = Image.open(f).convert("RGB")
-                    img.save(dst + ".pdf")
-                elif "PDF \u2192 TXT" in conv and ext == ".pdf":
-                    if not HAS_PDFPLUMBER:
-                        safe(self.log_panel.write, tr("convert_missing_lib", lib="pdfplumber"), "err")
-                        continue
-                    with pdfplumber.open(f) as pdf:
-                        text = "\n".join(p.extract_text() or "" for p in pdf.pages)
-                    with open(dst + ".txt", "w", encoding="utf-8") as tf:
-                        tf.write(text)
-                elif "CSV \u2192 Excel" in conv and ext == ".csv":
-                    if not HAS_OPENPYXL:
-                        safe(self.log_panel.write, tr("convert_missing_lib", lib="openpyxl"), "err")
-                        continue
-                    wb = Workbook()
-                    ws = wb.active
-                    with open(f, encoding="utf-8") as cf:
-                        for row in csv.reader(cf):
-                            ws.append(row)
-                    wb.save(dst + ".xlsx")
-                elif "Excel \u2192 CSV" in conv and ext in (".xlsx", ".xls"):
-                    if not HAS_OPENPYXL:
-                        safe(self.log_panel.write, tr("convert_missing_lib", lib="openpyxl"), "err")
-                        continue
-                    wb = load_workbook(f)
-                    ws = wb.active
-                    with open(dst + ".csv", "w", newline="", encoding="utf-8") as cf:
-                        w = csv.writer(cf)
-                        for row in ws.iter_rows(values_only=True):
-                            w.writerow(row)
-                safe(self.log_panel.write, f"\u2713 {os.path.basename(f)}", "ok")
+
+        def on_progress(pct):
+            safe(self.progress.setValue, int(pct))
+
+        def on_log(msg, tag):
+            safe(self.log_panel.write, msg, tag)
+
+        def on_error(msg):
+            safe(self.log_panel.write, f"\u2717 {msg}", "err")
+
+        results = self.converter.convert_files(
+            self.files, conv, out,
+            on_progress=on_progress,
+            on_log=on_log,
+            on_error=on_error,
+        )
+
+        for r in results:
+            if r.ok:
                 log(EVENT_CONVERT, STATUS_OK, conv, 1)
-            except Exception as e:
-                safe(self.log_panel.write, f"\u2717 {os.path.basename(f)}: {e}", "err")
-                log(EVENT_CONVERT, STATUS_ERROR, str(e), 1)
+            else:
+                log(EVENT_CONVERT, STATUS_ERROR, r.error or "", 1)
