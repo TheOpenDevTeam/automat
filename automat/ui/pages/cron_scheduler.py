@@ -12,6 +12,7 @@ from automat.ui.page_base import PageWidget
 from automat.ui.widgets import LogPanel
 from automat.core.activity_log import log, EVENT_SCHEDULE, STATUS_OK, STATUS_ERROR
 from automat.core.worker import run_in_background
+from automat.core.system_scheduler import system_scheduler
 from automat.core import json_io
 from automat.config import load_proxy
 from automat.util import safe
@@ -170,6 +171,18 @@ class CronSchedulerPage(PageWidget):
         except Exception as e:
             safe(self.log_panel.write, self.app.i18n.tr("cron_sched_error", err=e), "err")
 
+        # Also register with the host OS task scheduler so the task runs
+        # even when AUTOMAT is closed (best-effort; never blocks the UI).
+        try:
+            if system_scheduler.is_available() and task["type"] == "script":
+                system_scheduler.register_task(
+                    task["name"], task.get("cron", "*/5 * * * *"),
+                    [sys.executable, task["path"]],
+                    enabled=task.get("enabled", True),
+                )
+        except Exception:
+            pass
+
     def _add(self):
         name = self.task_name.text().strip()
         if not name:
@@ -283,6 +296,12 @@ class CronSchedulerPage(PageWidget):
                     job.remove()
             except Exception:
                 pass
+        # Unregister from host OS scheduler if present.
+        try:
+            if system_scheduler.is_available():
+                system_scheduler.unregister_task(self.tasks[row]["name"])
+        except Exception:
+            pass
         self.tasks.pop(row)
         self._refresh()
         self._save()
