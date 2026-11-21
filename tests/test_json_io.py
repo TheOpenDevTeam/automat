@@ -1,6 +1,5 @@
 """Tests for the JSON persistence helper (quarantine + atomic save)."""
 import json
-from pathlib import Path
 
 from automat.core import json_io
 
