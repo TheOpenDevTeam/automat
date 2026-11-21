@@ -4,13 +4,12 @@ Expanded: 100+ names per locale, real API data from randomuser.me / dummyjson / 
          + restcountries / quotable / dicebear, presets, seed, Luhn/INN/SNILS, FK.
 """
 
-import json, random, string, uuid, ipaddress, html as html_mod, csv, io, os, hashlib, time
+import json, random, uuid, ipaddress, html as html_mod, csv, io, os, hashlib, time
 from datetime import datetime, timedelta
 from pathlib import Path
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
-from automat.config import ACCENT
 from automat.ui.page_base import PageWidget
 from automat.core.activity_log import log, EVENT_DATAGEN, STATUS_OK
 from automat.core.worker import run_in_background
@@ -92,23 +91,23 @@ except ImportError:
 FIRST_NAMES_RU_M = [
     "Александр","Алексей","Андрей","Антон","Артём","Борис","Вадим","Валентин","Валерий","Виктор",
     "Виталий","Владимир","Владислав","Глеб","Григорий","Даниил","Денис","Дмитрий","Евгений","Егор",
-    "Иван","Ильяс","Кирилл","Константин","Лев","Леонид","Максим","Матвей","Михаил","Никита",
+    "Иван","Илья","Кирилл","Константин","Лев","Леонид","Максим","Матвей","Михаил","Никита",
     "Николай","Олег","Павел","Пётр","Роман","Руслан","Рустам","Сергей","Станислав","Тимур",
     "Фёдор","Филипп","Эдуард","Юрий","Ярослав","Аркадий","Богдан","Василий","Геннадий","Георгий",
-    "Давид","Данил","Захар","Игорь","Карл","Клеменс","Марк","Мирон","Платон","Радислав",
+    "Давид","Данил","Захар","Игорь","Кирилл","Клим","Марк","Мирон","Платон","Радислав",
     "Роберт","Святослав","Семён","Тарас","Устин","Феликс","Харитон","Эльдар","Ян",
 ]
 
 FIRST_NAMES_RU_F = [
     "Алина","Алиса","Анастасия","Ангелина","Анна","Валентина","Валерия","Варвара","Вера","Виктория",
     "Галина","Дарья","Евгения","Елена","Елизавета","Жанна","Зинаида","Злата","Ирина","Кира",
-    "Клавдия","Кристина","Лариса","Лена","Лидия","Лилия","Любовь","Людмила","Маргарита","Марина",
+    "Клавдия","Кристина","Лариса","Любава","Лидия","Лилия","Любовь","Людмила","Маргарита","Марина",
     "Мария","Надежда","Наталья","Нелли","Нина","Оксана","Ольга","Полина","Раиса","Регина",
     "Светлана","София","Тамара","Татьяна","Ульяна","Фаина","Элеонора","Юлия","Яна","Ярослава",
-    "Агата","Аглая","Аделаида","Акана","Амалия","Амина","Антонина","Белла","Василиса","Вероника",
+    "Агата","Аглая","Аделаида","Ариадна","Амалия","Амина","Антонина","Белла","Василиса","Вероника",
     "Виолетта","Виталина","Глафира","Дамира","Диана","Ева","Жасмин","Зарина","Зоя","Инга",
-    "Искра","Камилла","Карина","Каролина","Ксения","Лайма","Лера","Мирослава","Ника","Пелагея",
-    "Рената","Рита","Снежана","Соня","Сьяна","Таисия","Фрида","Хлоя","Эвелина","Эрика",
+    "Искра","Камилла","Карина","Каролина","Ксения","Лайма","Леона","Мирослава","Ника","Пелагея",
+    "Рената","Рита","Снежана","Соня","Стефания","Таисия","Фрида","Хлоя","Эвелина","Эрика",
     "Юлиана","Анфиса","Венера","Габриэлла",
 ]
 
@@ -120,20 +119,20 @@ LAST_NAMES_RU_M = [
     "Тихонов","Гусев","Киселёв","Игнатов","Лазарев","Тарасов","Богданов","Власов","Мельников","Денисов",
     "Китаев","Наумов","Шестаков","Афанасьев","Завьялов","Лукин","Баранов","Колычев","Егоров","Маслов",
     "Третьяков","Чернов","Авдеев","Жуков","Белозёров","Кочетков","Савельев","Львов","Горбунов","Пономарёв",
-    "Графов","Калачёв","Ершов","Баженов","Кадыров","Столяров","Кравцов","Понкратов","Горшков","Голубев",
-    "Пореченков","Кулешов",
+    "Графов","Калачёв","Ершов","Баженов","Кадыров","Столяров","Кравцов","Панкратов","Горшков","Голубев",
+    "Пореченков","Кулешов","Седов","Рябов","Бобылев",
 ]
 
 LAST_NAMES_RU_F = [
     "Иванова","Петрова","Сидорова","Смирнова","Кузнецова","Попова","Васильева","Зайцева","Павлова","Соколова",
     "Михайлова","Новикова","Морозова","Волкова","Соловьёва","Лебедева","Козлова","Ильина","Степанова","Николаева",
-    "Орлова","Андреева","Макарова","Никитина","Захарова","Борисова","Яковлева","Григорьева","Романова","Воробьёва",
+    "Орлова","Андреева","Макарова","Никитина","Захарова","Зурова","Борисова","Яковлева","Григорьева","Романова","Воробьёва",
     "Сергеева","Кузьмина","Фролова","Алексеева","Давыдова","Белова","Комарова","Матвеева","Полякова","Тихонова",
     "Гусева","Киселёва","Игнатова","Лазарева","Тарасова","Богданова","Власова","Мельникова","Денисова","Китаева",
     "Наумова","Шестакова","Афанасьева","Завьялова","Лукина","Баранова","Егорова","Маслова","Третьякова","Чернова",
     "Авдеева","Жукова","Белозёрова","Кочеткова","Савельева","Львова","Горбунова","Пономарёва","Графова","Калачёва",
-    "Ершова","Баженова","Кадырова","Столярова","Кравцова","Понкратова","Горшкова","Голубева","Кулешова","Седова",
-    "Рябова","Бобылева",
+    "Ершова","Баженова","Кадырова","Столярова","Кравцова","Панкратова","Горшкова","Голубева","Кулешова","Седова",
+    "Рябова","Бобылева","Колычева","Пореченкова",
 ]
 
 CITIES_RU = [
@@ -148,7 +147,7 @@ CITIES_RU = [
     "Мытищи","Подольск","Королёв","Балашиха","Химки","Люберцы","Одинцово","Красногорск","Домодедово",
 ]
 
-FIRST_NAMES_EN = [
+FIRST_NAMES_EN_M = [
     "James","John","Robert","Michael","David","William","Richard","Joseph","Thomas","Charles",
     "Christopher","Daniel","Matthew","Anthony","Mark","Donald","Steven","Paul","Andrew","Joshua",
     "Kenneth","Kevin","Brian","George","Timothy","Ronald","Edward","Jason","Jeffrey","Ryan",
@@ -157,9 +156,25 @@ FIRST_NAMES_EN = [
     "Tyler","Aaron","Jose","Adam","Nathan","Henry","Douglas","Zachary","Peter","Noah",
     "Harold","Kyle","Ethan","Jeremy","Walter","Christian","Keith","Roger","Terry","Austin",
     "Sean","Gerald","Carl","Arthur","Lawrence","Jesse","Dylan","Bryan","Joe","Jordan",
-    "Billy","Bruce","Gabriel","Vincent","Russell","Sylvia","Philip","Bobby","Harry","Eugene",
+    "Billy","Bruce","Gabriel","Vincent","Russell","Philip","Bobby","Harry","Eugene",
     "Logan","Aiden","Lucas","Mason","Liam","Oliver","Elijah",
 ]
+
+FIRST_NAMES_EN_F = [
+    "Mary","Patricia","Jennifer","Linda","Elizabeth","Barbara","Susan","Jessica","Sarah","Karen",
+    "Nancy","Lisa","Betty","Margaret","Sandra","Ashley","Kimberly","Emily","Donna","Michelle",
+    "Carol","Amanda","Dorothy","Melissa","Deborah","Stephanie","Rebecca","Sharon","Laura","Cynthia",
+    "Kathleen","Amy","Angela","Shirley","Anna","Brenda","Pamela","Emma","Nicole","Helen",
+    "Samantha","Katherine","Christine","Debra","Rachel","Carolyn","Janet","Catherine","Maria","Heather",
+    "Diane","Ruth","Julie","Olivia","Joyce","Virginia","Victoria","Kelly","Lauren","Christina",
+    "Joan","Evelyn","Judith","Megan","Andrea","Cheryl","Hannah","Jacqueline","Martha","Gloria",
+    "Teresa","Ann","Sara","Madison","Frances","Kathryn","Janice","Jean","Abigail","Alice",
+    "Julia","Judy","Sophia","Grace","Denise","Amber","Doris","Marilyn","Danielle","Beverly",
+    "Isabella","Theresa","Diana","Natalie","Brittany","Charlotte","Marie","Kayla","Alexis","Lori",
+    "Sylvia","Chloe","Ava","Mia","Ella","Zoe",
+]
+
+FIRST_NAMES_EN = FIRST_NAMES_EN_M + FIRST_NAMES_EN_F
 
 LAST_NAMES_EN = [
     "Smith","Johnson","Williams","Brown","Jones","Garcia","Miller","Davis","Rodriguez","Martinez",
@@ -196,13 +211,19 @@ COMPANIES = [
     "MiliScope","PicoScale","FemtoLab","AttoWorks","KiloNet","MegaDrive",
 ]
 
-STREETS = [
+STREETS_RU = [
     "ул. Ленина","ул. Пушкина","ул. Гагарина","ул. Мира","ул. Советская","ул. Центральная","ул. Молодёжная","ул. Садовая","ул. Парковая","ул. Речная",
-    "ул. Лесная","ул. Полевая","ул. Школьная","ул. Заводская","ул. Новая","ул. Старая","ул. Озёрная","ул. Горная","Main St","Oak St",
-    "Pine St","Maple St","Cedar St","Elm St","Walnut St","2nd Ave","3rd Ave","4th Ave","5th Ave","6th Ave",
-    "7th Ave","8th Ave","Park Ave","Broadway","Highland Ave","Lake Ave","Hill St","Spring St","Summer St","Winter St",
-    "River Rd","Mountain Rd","Forest Dr","Valley Blvd","Sunset Blvd","Pacific Hwy","Ocean Ave",
+    "ул. Лесная","ул. Полевая","ул. Школьная","ул. Заводская","ул. Новая","ул. Старая","ул. Озёрная","ул. Горная","ул. Солнечная","ул. Берёзовая",
+    "ул. Клубная","ул. Набережная","ул. Восточная","ул. Западная","ул. Южная","ул. Северная","ул. Строителей","ул. Космонавтов","ул. Победы","ул. Свободы",
 ]
+
+STREETS_EN = [
+    "Main St","Oak St","Pine St","Maple St","Cedar St","Elm St","Walnut St","2nd Ave","3rd Ave","4th Ave",
+    "5th Ave","6th Ave","7th Ave","8th Ave","Park Ave","Broadway","Highland Ave","Lake Ave","Hill St","Spring St",
+    "Summer St","Winter St","River Rd","Mountain Rd","Forest Dr","Valley Blvd","Sunset Blvd","Pacific Hwy","Ocean Ave","Cherry Ln",
+]
+
+STREETS = STREETS_RU + STREETS_EN
 
 JOB_TITLES = [
     "Software Engineer","Data Scientist","Product Manager","UX Designer","DevOps Engineer","Backend Developer","Frontend Developer","Full Stack Developer","ML Engineer","QA Engineer",
@@ -344,6 +365,57 @@ def _gen_iban(rng, country="RU"):
     tmp = bban + "272700"  # R=27 U=30
     chk = 98 - int(tmp) % 97
     return f"RU{chk:02d}{bban}"
+
+
+# ── PERSON HELPERS ───────────────────────────────────────────────────────────
+# One row is one person: first/last name, gender, e-mail, phone and address
+# must agree. Picking each field independently used to produce "Sylvia
+# Иванов" with an e-mail derived from yet another random name.
+
+_TRANSLIT = {
+    "а": "a", "б": "b", "в": "v", "г": "g", "д": "d", "е": "e", "ё": "e",
+    "ж": "zh", "з": "z", "и": "i", "й": "y", "к": "k", "л": "l", "м": "m",
+    "н": "n", "о": "o", "п": "p", "р": "r", "с": "s", "т": "t", "у": "u",
+    "ф": "f", "х": "kh", "ц": "ts", "ч": "ch", "ш": "sh", "щ": "sch",
+    "ъ": "", "ы": "y", "ь": "", "э": "e", "ю": "yu", "я": "ya",
+}
+
+RU_EMAIL_DOMAINS = ["mail.ru", "yandex.ru", "bk.ru", "list.ru", "inbox.ru"]
+EN_EMAIL_DOMAINS = ["example.com", "gmail.com", "outlook.com", "proton.me", "yahoo.com"]
+
+
+def _translit(text):
+    """Cyrillic -> Latin, preserving capitalisation (Пётр -> Petr)."""
+    out = []
+    for ch in str(text):
+        low = ch.lower()
+        if low in _TRANSLIT:
+            latin = _TRANSLIT[low]
+            out.append(latin.capitalize() if ch.isupper() and latin else latin)
+        else:
+            out.append(ch)
+    return "".join(out)
+
+
+def _has_cyrillic(text):
+    return any("а" <= ch.lower() <= "я" or ch.lower() == "ё" for ch in str(text))
+
+
+def _email_for(first, last, rng):
+    """E-mail built from the person's own name and locale."""
+    if _has_cyrillic(first) or _has_cyrillic(last):
+        local = f"{_translit(first)}.{_translit(last)}"
+        domains = RU_EMAIL_DOMAINS
+    else:
+        local = f"{first}.{last}"
+        domains = EN_EMAIL_DOMAINS
+    local = "".join(ch for ch in local.lower() if ch.isalnum() or ch in "._-")
+    return f"{local}{rng.randint(1, 999)}@{rng.choice(domains)}"
+
+
+def _website_for(last):
+    """Personal site derived from the surname, transliterated when needed."""
+    return f"https://{_translit(last).lower()}.example.com"
 
 
 # ── PUBLIC API SOURCES ───────────────────────────────────────────────────────
@@ -564,13 +636,13 @@ class DataGenPage(PageWidget):
             self.cache_info.setText(self.tr("datagen_cache_cleared"))
             self.api_status.setText("")
         except Exception as e:
-            QMessageBox.warning(self, "Error", str(e))
+            QMessageBox.warning(self, self.app.i18n.tr("common_error"), str(e))
 
     # ── API FETCHING ─────────────────────────────────────────────────────
 
     def _fetch_api_data(self):
         if not HAS_REQUESTS:
-            QMessageBox.warning(self, "Error", "pip install requests")
+            QMessageBox.warning(self, self.app.i18n.tr("common_error"), self.app.i18n.tr("common_install_requests"))
             return
         source = self.source.currentText()
         count = min(self.count.value(), 100)
@@ -707,98 +779,114 @@ class DataGenPage(PageWidget):
 
     # ── VALUE GENERATION ─────────────────────────────────────────────────
 
-    def _gen_value(self, field, i, locale_idx, rng):
-        is_ru = (locale_idx == 0)
-        is_en = (locale_idx == 1)
-        is_mixed = (locale_idx == 2)
+    def _build_person(self, locale_idx, rng):
+        """Create one coherent person for the selected locale."""
+        is_ru = locale_idx == 0 or (locale_idx == 2 and rng.random() < 0.5)
+        gender = rng.choice(["male", "female"])
+        if is_ru:
+            first = rng.choice(FIRST_NAMES_RU_M if gender == "male" else FIRST_NAMES_RU_F)
+            last = rng.choice(LAST_NAMES_RU_M if gender == "male" else LAST_NAMES_RU_F)
+            city = rng.choice(CITIES_RU)
+            street = rng.choice(STREETS_RU)
+            country = "Russia"
+            phone = (f"+7 ({rng.randint(900, 999)}) {rng.randint(100, 999)}-"
+                     f"{rng.randint(10, 99)}-{rng.randint(10, 99)}")
+        else:
+            first = rng.choice(FIRST_NAMES_EN_M if gender == "male" else FIRST_NAMES_EN_F)
+            last = rng.choice(LAST_NAMES_EN)
+            city = rng.choice(CITIES_EN)
+            street = rng.choice(STREETS_EN)
+            country = "USA"
+            phone = (f"+1 ({rng.randint(200, 999)}) {rng.randint(100, 999)}-"
+                     f"{rng.randint(1000, 9999)}")
+        age = rng.randint(18, 75)
+        birthdate = (datetime(2025, 1, 1)
+                     - timedelta(days=age * 365 + rng.randint(0, 364))).strftime("%Y-%m-%d")
+        seed = _translit(first) + str(rng.randint(1, 9999))
+        return {
+            "first_name": first,
+            "last_name": last,
+            "gender": gender,
+            "age": age,
+            "birthdate": birthdate,
+            "city": city,
+            "country": country,
+            "street": street,
+            "address": f"{street}, {rng.randint(1, 200)}",
+            "phone": phone,
+            "email": _email_for(first, last, rng),
+            "website": _website_for(last),
+            "company": rng.choice(COMPANIES),
+            "avatar": f"https://api.dicebear.com/7.x/avataaars/svg?seed={seed}",
+        }
 
-        def pick_ru_first():
-            return rng.choice(FIRST_NAMES_RU_M + FIRST_NAMES_RU_F)
-
-        def pick_ru_last():
-            return rng.choice(LAST_NAMES_RU_M + LAST_NAMES_RU_F)
-
-        def pick_en_first():
-            return rng.choice(FIRST_NAMES_EN)
-
-        def pick_en_last():
-            return rng.choice(LAST_NAMES_EN)
-
-        def pick_first():
-            if is_mixed:
-                return rng.choice([pick_ru_first(), pick_en_first()])
-            return pick_ru_first() if is_ru else pick_en_first()
-
-        def pick_last():
-            if is_mixed:
-                return rng.choice([pick_ru_last(), pick_en_last()])
-            return pick_ru_last() if is_ru else pick_en_last()
-
-        def pick_city():
-            if is_mixed:
-                return rng.choice(CITIES_RU + CITIES_EN)
-            return rng.choice(CITIES_RU if is_ru else CITIES_EN)
-
-        # API cache (random.choice still deterministic via rng if seed set — use rng.choice)
+    def _person_for_row(self, i, locale_idx, rng):
+        """Cached person for row `i`; API records override local fields."""
+        person = self._person_cache.get(i)
+        if person is not None:
+            return person
+        person = self._build_person(locale_idx, rng)
         if self._api_cache:
-            api_user = rng.choice(self._api_cache)
-            if field == "id": return i
-            if field == "first_name": return api_user.get("first_name", pick_first())
-            if field == "last_name": return api_user.get("last_name", pick_last())
-            if field == "name":
-                fn = api_user.get("first_name", pick_first())
-                ln = api_user.get("last_name", pick_last())
-                return f"{fn} {ln}"
-            if field == "email":
-                if api_user.get("email"):
-                    return api_user["email"]
-                fn = rng.choice(FIRST_NAMES_EN).lower()
-                ln = rng.choice(LAST_NAMES_EN).lower()
-                return f"{fn}.{ln}{rng.randint(1,999)}@example.com"
-            if field == "phone": return api_user.get("phone", f"+7{rng.randint(900,999)}{rng.randint(1000000,9999999)}")
-            if field == "age": return api_user.get("age", rng.randint(18, 70))
-            if field == "gender": return api_user.get("gender", rng.choice(["male","female"]))
-            if field == "city": return api_user.get("city", pick_city())
-            if field == "country": return api_user.get("country", rng.choice(COUNTRIES))
-            if field == "currency": return api_user.get("currency", rng.choice(CURRENCIES))
-            if field == "address":
-                if api_user.get("address"):
-                    return api_user["address"]
-                street = rng.choice(STREETS)
-                return f"{street}, {rng.randint(1,200)}"
-            if field == "avatar": return api_user.get("avatar", "")
-            if field == "website": return api_user.get("website", f"https://{rng.choice(LAST_NAMES_EN).lower()}.example.com")
-            if field == "company": return api_user.get("company", rng.choice(COMPANIES))
+            api = rng.choice(self._api_cache)
+            first = str(api.get("first_name") or "").strip()
+            last = str(api.get("last_name") or "").strip()
+            # Only take a name as a pair, otherwise the row would mix sources.
+            if first and last:
+                person["first_name"] = first
+                person["last_name"] = last
+            for key in ("phone", "city", "country", "address", "company"):
+                value = api.get(key)
+                if value:
+                    person[key] = value
+            age = api.get("age")
+            if isinstance(age, int) and 0 < age < 120:
+                person["age"] = age
+            gender = str(api.get("gender") or "").lower()
+            if gender in ("male", "female"):
+                person["gender"] = gender
+            person["email"] = api.get("email") or _email_for(
+                person["first_name"], person["last_name"], rng)
+            person["website"] = api.get("website") or _website_for(person["last_name"])
+            person["avatar"] = api.get("avatar") or person["avatar"]
+        self._person_cache[i] = person
+        return person
 
-        # Local generation
+    def _gen_value(self, field, i, locale_idx, rng):
+        person = None
+
+        def who():
+            nonlocal person
+            if person is None:
+                person = self._person_for_row(i, locale_idx, rng)
+            return person
+
+        # Person fields all read from the same record, so a row never mixes
+        # a male first name with a female surname or someone else's e-mail.
         if field == "id": return i
-        if field == "first_name": return pick_first()
-        if field == "last_name": return pick_last()
-        if field == "name": return f"{pick_first()} {pick_last()}"
-        if field == "email":
-            domains = ["example.com","gmail.com","mail.ru","yandex.ru","outlook.com","proton.me"]
-            fn = rng.choice(FIRST_NAMES_EN).lower()
-            ln = rng.choice(LAST_NAMES_EN).lower()
-            return f"{fn}.{ln}{rng.randint(1,999)}@{rng.choice(domains)}"
-        if field == "phone":
-            use_ru = is_ru or (is_mixed and rng.random() < 0.5)
-            if use_ru:
-                return f"+7 ({rng.randint(900,999)}) {rng.randint(100,999)}-{rng.randint(10,99)}-{rng.randint(10,99)}"
-            return f"+1 ({rng.randint(200,999)}) {rng.randint(100,999)}-{rng.randint(1000,9999)}"
-        if field == "age": return rng.randint(18, 75)
-        if field == "gender": return rng.choice(["male","female","other"])
-        if field == "birthdate":
-            d = datetime(1970, 1, 1) + timedelta(days=rng.randint(0, 18000))
-            return d.strftime("%Y-%m-%d")
-        if field == "city": return pick_city()
-        if field == "country": return rng.choice(COUNTRIES)
-        if field == "currency": return rng.choice(CURRENCIES)
-        if field == "address":
-            street = rng.choice(STREETS)
-            return f"{street}, {rng.randint(1,200)}"
+        if field == "first_name": return who()["first_name"]
+        if field == "last_name": return who()["last_name"]
+        if field == "name": return f"{who()['first_name']} {who()['last_name']}"
+        if field == "email": return who()["email"]
+        if field == "phone": return who()["phone"]
+        if field == "gender": return who()["gender"]
+        if field == "age": return who()["age"]
+        if field == "birthdate": return who()["birthdate"]
+        if field == "city": return who()["city"]
+        if field == "country": return who()["country"]
+        if field == "address": return who()["address"]
+        if field == "website": return who()["website"]
+        if field == "avatar": return who()["avatar"]
+        if field == "company": return who()["company"]
+
+        # Remaining fields are independent of the person record.
+        if field == "currency":
+            if self._country_cache:
+                country = rng.choice(self._country_cache)
+                if country.get("currency"):
+                    return country["currency"]
+            return rng.choice(CURRENCIES)
         if field == "lat": return round(rng.uniform(-90, 90), 6)
         if field == "lng": return round(rng.uniform(-180, 180), 6)
-        if field == "company": return rng.choice(COMPANIES)
         if field == "job_title": return rng.choice(JOB_TITLES)
         if field == "product": return rng.choice(PRODUCTS)
         if field == "salary": return rng.randint(30000, 500000)
@@ -810,8 +898,6 @@ class DataGenPage(PageWidget):
         if field == "date":
             d = datetime(2020, 1, 1) + timedelta(days=rng.randint(0, 2000))
             return d.strftime(rng.choice(["%Y-%m-%d","%d.%m.%Y","%m/%d/%Y"]))
-        if field == "website":
-            return f"https://{rng.choice(LAST_NAMES_EN).lower()}.example.com"
         if field == "credit_card":
             # Visa/Master/Mir prefixes with valid Luhn
             prefix = rng.choice(["4", "51", "52", "53", "54", "55", "2200", "2204"])
@@ -857,6 +943,9 @@ class DataGenPage(PageWidget):
             return
         seed_val = self.seed.value()
         rng = random.Random(seed_val) if seed_val != 0 else random
+
+        # Per-row person cache so all fields of one row agree.
+        self._person_cache = {}
 
         # FK mode: generate second table orders
         fk_enabled = self.fk_check.isChecked()

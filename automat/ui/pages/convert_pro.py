@@ -1,5 +1,5 @@
 """
-File conversion page — Excel↔PDF, PDF→Word, Images→PDF, CSV↔Excel.
+File conversion page вЂ” Excelв†”PDF, PDFв†’Word, Imagesв†’PDF, CSVв†”Excel.
 Fixed: Worker pattern, confirmation dialog, thread-safety.
 """
 
@@ -7,7 +7,8 @@ from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 import os
-from automat.config import ACCENT, GREEN, RED
+import csv
+from automat.config import APP_NAME
 from automat.ui.page_base import PageWidget
 from automat.ui.widgets import LogPanel, ProgressBar, ValidatedLineEdit
 from automat.core.activity_log import log, EVENT_CONVERT, STATUS_OK, STATUS_ERROR
@@ -82,7 +83,7 @@ class ConvertProPage(PageWidget):
         ll.addWidget(self.out_path)
         browse_out = QPushButton(tr("convert_browse"))
         browse_out.setObjectName("accent")
-        browse_out.setToolTip("Select input files")
+        browse_out.setToolTip(tr("convert_browse_out_tip"))
         browse_out.clicked.connect(self._browse_out)
         ll.addWidget(browse_out)
         self.overwrite = QCheckBox(tr("convert_overwrite"))
@@ -96,7 +97,7 @@ class ConvertProPage(PageWidget):
         self.file_list = QListWidget()
         rl.addWidget(self.file_list)
         btn_row = QHBoxLayout()
-        btn_tips = ["Add individual files", "Add all files from folder", "Clear file list"]
+        btn_tips = [tr("convert_add_tip"), tr("convert_add_folder_tip"), tr("convert_clear_tip")]
         for (txt, fn), tip in zip([
             (tr("convert_add"), self._add_files),
             (tr("convert_add_folder"), self._add_folder),
@@ -111,12 +112,12 @@ class ConvertProPage(PageWidget):
         btn_row2 = QHBoxLayout()
         convert_btn = QPushButton(tr("convert_convert_btn"))
         convert_btn.setObjectName("accent")
-        convert_btn.setToolTip("Start conversion")
+        convert_btn.setToolTip(tr("convert_run_tip"))
         convert_btn.clicked.connect(self._convert)
         btn_row2.addWidget(convert_btn)
         stop_btn = QPushButton("\u23f9 " + self.app.i18n.tr("bulk_stop"))
         stop_btn.setObjectName("danger")
-        stop_btn.setToolTip("Stop conversion")
+        stop_btn.setToolTip(tr("convert_stop_tip"))
         stop_btn.clicked.connect(self._stop)
         btn_row2.addWidget(stop_btn)
         self.content_layout.addLayout(btn_row2)
@@ -124,24 +125,31 @@ class ConvertProPage(PageWidget):
         self.content_layout.addWidget(self.log_panel)
 
     def _browse_out(self):
-        d = QFileDialog.getExistingDirectory(self, "Output folder")
+        d = QFileDialog.getExistingDirectory(self, self.app.i18n.tr("convert_out_folder"))
         if d:
             self.out_path.setText(d)
 
     def _add_files(self):
-        files, _ = QFileDialog.getOpenFileNames(self, "Select files")
-        for f in files:
-            self.files.append(f)
-            self.file_list.addItem(os.path.basename(f))
+        files, _ = QFileDialog.getOpenFileNames(self, self.app.i18n.tr("convert_add"))
+        self._add_paths(files)
+
+    def _add_paths(self, paths):
+        added = 0
+        for f in paths:
+            if os.path.isfile(f) and f not in self.files:
+                self.files.append(f)
+                self.file_list.addItem(os.path.basename(f))
+                added += 1
+        if added and hasattr(self.app, "toast"):
+            self.app.toast(f"+{added}")
+
+    def accept_dropped_paths(self, paths):
+        self._add_paths(paths)
 
     def _add_folder(self):
-        d = QFileDialog.getExistingDirectory(self, "Folder with files")
+        d = QFileDialog.getExistingDirectory(self, self.app.i18n.tr("convert_add_folder"))
         if d:
-            for f in os.listdir(d):
-                fp = os.path.join(d, f)
-                if os.path.isfile(fp):
-                    self.files.append(fp)
-                    self.file_list.addItem(f)
+            self._add_paths([os.path.join(d, f) for f in os.listdir(d)])
 
     def _clear(self):
         self.files.clear()
@@ -149,15 +157,15 @@ class ConvertProPage(PageWidget):
 
     def _convert(self):
         if not self.files:
-            QMessageBox.warning(self, "Error", "No files selected")
+            QMessageBox.warning(self, APP_NAME, self.app.i18n.tr("convert_no_files"))
             return
         if not self.out_path.text():
-            QMessageBox.warning(self, "Error", "Select output folder")
+            QMessageBox.warning(self, APP_NAME, self.app.i18n.tr("convert_no_out"))
             return
         # Confirmation dialog for batch operation
         reply = QMessageBox.question(
-            self, "Confirm",
-            f"Convert {len(self.files)} file(s)?",
+            self, APP_NAME,
+            self.app.i18n.tr("convert_confirm", n=len(self.files)),
             QMessageBox.Yes | QMessageBox.No,
         )
         if reply != QMessageBox.Yes:
@@ -172,13 +180,14 @@ class ConvertProPage(PageWidget):
 
     def _stop(self):
         self.stop_flag = True
-        self.log_panel.write("Stopping...", "warn")
+        self.log_panel.write(self.app.i18n.tr("convert_stopping"), "warn")
 
     def _on_done(self, _):
         self.progress.setValue(100)
 
     def _run(self):
         from automat.util import safe
+        tr = self.app.i18n.tr
         out = self.out_path.text()
         conv = self.conv_type.currentText()
         total = len(self.files)
@@ -193,7 +202,7 @@ class ConvertProPage(PageWidget):
                 dst = os.path.join(out, name)
                 if "Excel \u2192 PDF" in conv and ext in (".xlsx", ".xls"):
                     if not HAS_OPENPYXL or not HAS_REPORTLAB:
-                        safe(self.log_panel.write, "\u2717 install: pip install reportlab openpyxl", "err")
+                        safe(self.log_panel.write, tr("convert_missing_lib", lib="reportlab openpyxl"), "err")
                         continue
                     wb = load_workbook(f)
                     ws = wb.active
@@ -205,25 +214,25 @@ class ConvertProPage(PageWidget):
                     cv.save()
                 elif "PDF \u2192 Word" in conv and ext == ".pdf":
                     if not HAS_PDF2DOCX:
-                        safe(self.log_panel.write, "\u2717 install: pip install pdf2docx", "err")
+                        safe(self.log_panel.write, tr("convert_missing_lib", lib="pdf2docx"), "err")
                         continue
                     cv = Converter(f)
                     cv.convert(dst + ".docx")
                     cv.close()
                 elif "Word \u2192 PDF" in conv and ext == ".docx":
                     if not HAS_DOCX2PDF:
-                        safe(self.log_panel.write, "\u2717 install: pip install docx2pdf", "err")
+                        safe(self.log_panel.write, tr("convert_missing_lib", lib="docx2pdf"), "err")
                         continue
                     w2p(f, dst + ".pdf")
                 elif "Images \u2192 PDF" in conv and ext in (".png", ".jpg", ".jpeg", ".bmp"):
                     if not HAS_PIL:
-                        safe(self.log_panel.write, "\u2717 install: pip install Pillow", "err")
+                        safe(self.log_panel.write, tr("convert_missing_lib", lib="Pillow"), "err")
                         continue
                     img = Image.open(f).convert("RGB")
                     img.save(dst + ".pdf")
                 elif "PDF \u2192 TXT" in conv and ext == ".pdf":
                     if not HAS_PDFPLUMBER:
-                        safe(self.log_panel.write, "\u2717 install: pip install pdfplumber", "err")
+                        safe(self.log_panel.write, tr("convert_missing_lib", lib="pdfplumber"), "err")
                         continue
                     with pdfplumber.open(f) as pdf:
                         text = "\n".join(p.extract_text() or "" for p in pdf.pages)
@@ -231,7 +240,7 @@ class ConvertProPage(PageWidget):
                         tf.write(text)
                 elif "CSV \u2192 Excel" in conv and ext == ".csv":
                     if not HAS_OPENPYXL:
-                        safe(self.log_panel.write, "\u2717 install: pip install openpyxl", "err")
+                        safe(self.log_panel.write, tr("convert_missing_lib", lib="openpyxl"), "err")
                         continue
                     wb = Workbook()
                     ws = wb.active
@@ -241,7 +250,7 @@ class ConvertProPage(PageWidget):
                     wb.save(dst + ".xlsx")
                 elif "Excel \u2192 CSV" in conv and ext in (".xlsx", ".xls"):
                     if not HAS_OPENPYXL:
-                        safe(self.log_panel.write, "\u2717 install: pip install openpyxl", "err")
+                        safe(self.log_panel.write, tr("convert_missing_lib", lib="openpyxl"), "err")
                         continue
                     wb = load_workbook(f)
                     ws = wb.active
